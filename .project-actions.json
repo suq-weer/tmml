@@ -1,0 +1,16 @@
+{
+  "actions": [
+    {
+      "text": "$(package) Tauri Build",
+      "command": "bash ./build.sh",
+      "tooltip": "启动项目 release 构建",
+      "color": "lightGreen"
+    },
+    {
+      "text": "$(testing-run-icon) Test",
+      "command": "bun run tauri dev",
+      "tooltip": "启动测试环境",
+      "color": "lightYellow"
+    }
+  ]
+}
