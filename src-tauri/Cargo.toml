@@ -24,7 +24,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 system-theme = "0.3.0"
 zip = "8.6.0"
-reqwest = { version = "0.13.4", features = ["json", "stream"] }
+reqwest = { version = "0.13.4", features = ["json", "stream", "gzip"] }
 tokio = { version = "1.53.1", features = ["full", "test-util"] }
 futures-util = "0.3.33"
 anyhow = "1.0.104"
@@ -32,6 +32,8 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt", "ansi"] }
 time = { version = "0.3.55", features = ["formatting", "macros"] }
 tauri-plugin-fs = "2"
+directories = "6.0.0"
+tauri-plugin-tracing = "0.3.4"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

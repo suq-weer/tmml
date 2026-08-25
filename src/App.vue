@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import Home from './pages/Home.vue';
-import Title from './components/Title.vue';
+import { RouterView, useRouter } from 'vue-router';
+
+const router = useRouter();
+function push(route: string) {
+    router.push(route)
+}
 </script>
 
 <template>
@@ -16,7 +20,9 @@ import Title from './components/Title.vue';
             <side-bar />
         </mdui-layout-item>-->
         <mdui-layout-main class="main-page">
-            <home />
+            <mdui-button @click="push('/')">/</mdui-button>
+            <mdui-button @click="push('/version')">/version</mdui-button>
+            <router-view />
         </mdui-layout-main>
     </mdui-layout>
 </template>

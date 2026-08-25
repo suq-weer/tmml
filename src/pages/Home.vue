@@ -7,7 +7,7 @@ import { fetch_mc_version_paged } from '../libs/query_backend.ts';
 var mc_ver = ref<VersionManifest | null>();
 
 function fetch_mc_version() {
-    fetch_mc_version_paged().then((v) => {
+    fetch_mc_version_paged(20, 1, 'RELEASE').then((v) => {
         mc_ver.value = v
     })
 }
