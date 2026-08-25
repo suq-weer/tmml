@@ -2,6 +2,10 @@
 
 <p align=center><sub><del><b>🥵<i>Minecraft 启动器真的太多啦~！</i></b></del></sub></p>
 
+## 介绍
+
+> 注：目前项目仍作为空壳，还不能实现 Minecraft 的下载与启动
+
 ## 推荐的 IDE 配置
 
 本项目建议使用 [VS Code](https://code.visualstudio.com/) 开发，安装工作区所有的建议插件可获得最佳开发体验。
@@ -15,6 +19,10 @@
 - [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
 - [Project Actions](https://open-vsx.org/extension/julynx/project-actions)
 
-## 素材来源
+## 开源许可
+
+除特别注明的部分外，代码均使用 LGPL-v3.0 协议进行开源。
+
+## 部分素材来源
 
 - Minecraft 草方块与泥土：[Minecraft 中文 Wiki](https://zh.minecraft.wiki/)
