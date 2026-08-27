@@ -8,6 +8,7 @@ import { useDark } from "@vueuse/core";
 import { createMemoryHistory, createRouter } from "vue-router";
 import TestVersionDownload from "./pages/TestVersionDownload.vue";
 import { interceptConsole } from "@fltsci/tauri-plugin-tracing";
+import Notifications from "./pages/Notifications.vue";
 import Home from "./pages/Home.vue";
 
 // 初始化日志系统
@@ -36,7 +37,8 @@ console.debug("系统深色模式: " + mode.value)
 // 路由创建
 const routes = [
     { path: "/", component: TestVersionDownload },
-    { path: "/version", component: Home }
+    { path: "/version", component: Home },
+    { path: "/notifications", component: Notifications }
 ]
 const router = createRouter({
     history: createMemoryHistory(),

@@ -82,10 +82,10 @@ export interface AssetsIndex {
 // - downloads
 
 export interface Downloads {
-  client: DownloadsFile;
-  client_mappings: DownloadsFile;
-  server: DownloadsFile;
-  server_mappings: DownloadsFile;
+  client?: DownloadsFile;
+  client_mappings?: DownloadsFile;
+  server?: DownloadsFile;
+  server_mappings?: DownloadsFile;
 }
 
 export interface DownloadsFile {

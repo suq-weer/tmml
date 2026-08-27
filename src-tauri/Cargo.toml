@@ -34,6 +34,8 @@ time = { version = "0.3.55", features = ["formatting", "macros"] }
 tauri-plugin-fs = "2"
 directories = "6.0.0"
 tauri-plugin-tracing = "0.3.4"
+sha1 = "0.10"
+hex = "0.4"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

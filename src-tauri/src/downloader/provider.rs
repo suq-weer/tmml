@@ -4,10 +4,10 @@ use std::{
     sync::LazyLock,
 };
 use tokio::fs;
-use tracing::info;
+use tracing::{info, warn};
 use anyhow::bail;
 use crate::{
-    appfile::dirs::{self}, downloader::{
+    appfile::{dirs::{self}, file}, downloader::{
         deserializer::{self, FOOL_VERSIONS, SingleVersion, VersionManifest}, net::fetch_and_parse_json, urls::VERSION_MANIFEST,
     },
 };
@@ -34,6 +34,29 @@ pub enum VersionMode {
 
 pub static VER_ALL: LazyLock<Mutex<VersionManifestProvider>> =
     LazyLock::new(|| Mutex::new(VersionManifestProvider::default()));
+
+/// 程序启动时从本地 version_manifest.json 读取已缓存的数据并填充 VER_ALL（失败时静默忽略）
+pub async fn load_local_manifest() {
+    let mut provider = VER_ALL.lock().await;
+    if provider.ver.is_some() {
+        return;
+    }
+    let Ok(path) = dirs::dot_minecraft().map(|dir| dir.join("version_manifest.json")) else {
+        return;
+    };
+    if !path.exists() {
+        return;
+    }
+    match file::read_and_parse_json::<deserializer::VersionManifest>(path.clone()) {
+        Ok(manifest) => {
+            info!(path = ?path, "已从本地加载 version_manifest.json");
+            provider.ver = Some(manifest);
+        }
+        Err(e) => {
+            warn!(path = ?path, "读取本地 version_manifest.json 失败: {}", e);
+        }
+    }
+}
 
 pub async fn get_minecraft_version_paged(
     size_u: u32,
