@@ -4,7 +4,20 @@
 
 ## 介绍
 
-> 注：目前项目仍作为空壳，还不能实现 Minecraft 的下载与启动
+> 注：目前项目仍作为空壳，还不能实现完整的 Minecraft 启动器体验
+### 正在实现
+
+#### 后端
+
+- [x] 原版较新版本 Minecraft 下载
+- [ ] Minecraft 实例管理
+- [ ] 游戏档案管理
+- [ ] JVM 参数生成
+- [ ] Minecraft 启动（离线）
+
+#### 前端
+- [x] MC 下载进度监测
+- [ ] UI 初步设计
 
 ## 推荐的 IDE 配置
 
@@ -14,10 +27,13 @@
 
 ### 建议的插件
 
-- [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
-- [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode)
-- [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
-- [Project Actions](https://open-vsx.org/extension/julynx/project-actions)
+- [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar)（Vue 支持）
+- [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode)（Tauri 支持）
+- [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)（Rust 支持）
+- [Project Actions](https://marketplace.visualstudio.com/items?itemName=Julynx.project-actions)（快速启动本地项目测试）
+- [mdui](https://marketplace.visualstudio.com/items?itemName=zdhxiong.mdui)（UI 库语法联想支持）
+- [TARUS](https://marketplace.visualstudio.com/items?itemName=mvoof.tarus-vscode-extension)（Tauri `invoke<>()` 关联支持）
+- [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml)（TOML 支持）
 
 ## 开源许可
 

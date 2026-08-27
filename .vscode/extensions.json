@@ -1,8 +1,10 @@
 {
   "recommendations": [
-    "Vue.volar",
     "tauri-apps.tauri-vscode",
     "rust-lang.rust-analyzer",
-    "julynx.project-actions"
+    "julynx.project-actions",
+    "zdhxiong.mdui",
+    "mvoof.tarus-vscode-extension",
+    "tamasfe.even-better-toml"
   ]
 }
