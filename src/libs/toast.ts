@@ -118,8 +118,14 @@ function create_download_state(payload: ToastPayload): DownloadToastState {
     };
 }
 
+function find_active_download(versionId?: string) {
+    return toasts.value.find((t) => t.kind === 'download' && t.versionId === versionId && !t.download?.finished)
+        ?? notifications.value.find((n) => n.kind === 'download' && n.versionId === versionId && !n.download?.finished);
+}
+
 function find_download(versionId?: string) {
-    return toasts.value.find((t) => t.kind === 'download' && t.versionId === versionId)
+    return find_active_download(versionId)
+        ?? toasts.value.find((t) => t.kind === 'download' && t.versionId === versionId)
         ?? notifications.value.find((n) => n.kind === 'download' && n.versionId === versionId);
 }
 
@@ -128,20 +134,36 @@ function schedule_dismiss(id: number, ms: number) {
 }
 
 function upsert_download(payload: ToastPayload) {
-    const existing = find_download(payload.versionId);
-    if (existing && existing.download) {
-        existing.level = payload.level;
-        existing.title = payload.title;
-        existing.message = payload.message;
-        existing.download.level = payload.level;
-        existing.download.title = payload.title;
-        existing.download.message = payload.message;
-        if (payload.level === 'success' || payload.level === 'error') {
-            existing.download.finished = true;
-            schedule_dismiss(existing.id, AUTO_DISMISS_MS[payload.level]);
-        }
+    if (payload.level === 'info') {
+        // 下载开始：每个下载会话都新建独立条目，避免复用历史已结束条目导致状态错乱
+        const item: ToastItem = {
+            id: next_id++,
+            level: payload.level,
+            title: payload.title,
+            message: payload.message,
+            timestamp: Date.now(),
+            kind: 'download',
+            versionId: payload.versionId,
+            download: create_download_state(payload),
+        };
+        toasts.value.push(item);
+        notifications.value.unshift(item);
         return;
     }
+    // 结束（成功/失败/取消）：只更新"进行中"的同版本条目
+    const active = find_active_download(payload.versionId);
+    if (active && active.download) {
+        active.level = payload.level;
+        active.title = payload.title;
+        active.message = payload.message;
+        active.download.level = payload.level;
+        active.download.title = payload.title;
+        active.download.message = payload.message;
+        active.download.finished = true;
+        schedule_dismiss(active.id, AUTO_DISMISS_MS[payload.level]);
+        return;
+    }
+    // 没有进行中条目（可能已在消息盒被移除）：仅保留一条记录
     const item: ToastItem = {
         id: next_id++,
         level: payload.level,
@@ -152,7 +174,7 @@ function upsert_download(payload: ToastPayload) {
         versionId: payload.versionId,
         download: create_download_state(payload),
     };
-    toasts.value.push(item);
+    item.download!.finished = true;
     notifications.value.unshift(item);
 }
 
@@ -254,8 +276,7 @@ function cancel_if_downloading(item: ToastItem | undefined) {
 }
 
 function dismissToast(id: number) {
-    const item = toasts.value.find((t) => t.id === id);
-    cancel_if_downloading(item);
+    // 只隐藏，不取消下载；取消仅在消息盒子里触发
     toasts.value = toasts.value.filter((t) => t.id !== id);
 }
 

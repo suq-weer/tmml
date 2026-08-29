@@ -255,8 +255,8 @@ impl PhaseProgress {
 
 // | 路径工具 |
 
-async fn versions_dir(version_id: &str) -> Result<PathBuf> {
-    let dir = dirs::dot_minecraft()?.join("versions").join(version_id);
+async fn versions_dir(dir_name: &str) -> Result<PathBuf> {
+    let dir = dirs::dot_minecraft()?.join("versions").join(dir_name);
     fs::create_dir_all(&dir).await?;
     Ok(dir)
 }
@@ -275,14 +275,17 @@ pub struct MinecraftDownloader {
     app: AppHandle,
     config: MainConfig,
     cancel: Arc<AtomicBool>,
+    /// 实例文件存放目录名（通常为实例名或版本号）
+    dir_name: String,
 }
 
 impl MinecraftDownloader {
-    pub fn new(app: AppHandle, config: MainConfig, cancel: Arc<AtomicBool>) -> Self {
+    pub fn new(app: AppHandle, config: MainConfig, cancel: Arc<AtomicBool>, dir_name: String) -> Self {
         Self {
             app,
             config,
             cancel,
+            dir_name,
         }
     }
 
@@ -341,7 +344,7 @@ impl MinecraftDownloader {
             official_url,
             version_id,
         );
-        let dest = versions_dir(version_id)
+        let dest = versions_dir(&self.dir_name)
             .await?
             .join(format!("{}.json", version_id));
         let progress = PhaseProgress {
@@ -379,7 +382,7 @@ impl MinecraftDownloader {
         let Some(client) = &content.downloads.client else {
             bail!("该版本缺少 downloads.client，无法下载客户端");
         };
-        let jar_dest = versions_dir(version_id)
+        let jar_dest = versions_dir(&self.dir_name)
             .await?
             .join(format!("{}.jar", version_id));
         tasks.push(DownloadTask {

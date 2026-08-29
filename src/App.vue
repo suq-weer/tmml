@@ -1,17 +1,41 @@
 <script setup lang="ts">
 import { RouterView, useRouter } from 'vue-router';
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import ToastHost from './components/ToastHost.vue';
 import { useToastStore } from './libs/toast';
+import { get_instance_icon, useProfileStore } from './libs/profile';
 import '@mdui/icons/notifications';
+import '@mdui/icons/group.js';
+import '@mdui/icons/checkroom.js';
+import '@mdui/icons/settings.js';
+import '@mdui/icons/play-circle.js';
+import '@mdui/icons/person-add-alt-1.js';
 
 const router = useRouter();
-const { notifications } = useToastStore();
+const { notifications, pushToast } = useToastStore();
+const { current, lastLaunched, profiles, refresh } = useProfileStore();
+
 const unread_count = computed(() => notifications.value.length);
+const has_profiles = computed(() => profiles.value.length > 0);
+const current_profile_name = computed(() => current.value?.name ?? profiles.value[0]?.name ?? '');
+
+const instance_icon_src = ref('/src/assets/mc_icon.png');
 
 function push(route: string) {
     router.push(route)
 }
+
+function toast_launch_not_ready() {
+    pushToast({ level: 'info', title: '启动功能开发中' });
+}
+
+onMounted(async () => {
+    await refresh();
+    if (lastLaunched.value) {
+        const icon = await get_instance_icon(lastLaunched.value.dir);
+        if (icon) instance_icon_src.value = icon;
+    }
+});
 </script>
 
 <template>
@@ -20,19 +44,50 @@ function push(route: string) {
             <img class="mc-avatar" src="/src/assets/mc_icon.png" alt="avatar" />
             <mdui-top-app-bar-title>
                 Too Many Minecraft Launcher
-                <span slot="label-large">欢迎！XiaosuLikeJvav</span>
+                <span slot="label-large" class="label-large-content">
+                    <template v-if="has_profiles">
+                        欢迎！{{ current_profile_name }}
+                        <mdui-button-icon @click="push('/profiles')">
+                            <mdui-icon-group></mdui-icon-group>
+                        </mdui-button-icon>
+                        <mdui-button-icon>
+                            <mdui-icon-checkroom></mdui-icon-checkroom>
+                        </mdui-button-icon>
+                    </template>
+                    <template v-else>
+                        <span class="create_text">请新建一个用户档案</span>
+                        <mdui-button-icon @click="push('/profiles')">
+                            <mdui-icon-person-add-alt-1></mdui-icon-person-add-alt-1>
+                        </mdui-button-icon>
+                    </template>
+                    <br />
+                    <sub class="last-launched">
+                        <template v-if="lastLaunched">
+                            从实例 <img class="instance_icon" :src="instance_icon_src" alt="instance_icon" /> {{ lastLaunched.name }} 继续
+                            <mdui-button-icon @click="toast_launch_not_ready()">
+                                <mdui-icon-play-circle></mdui-icon-play-circle>
+                            </mdui-button-icon>
+                        </template>
+                        <template v-else>
+                            最近没有运行任何实例
+                            <mdui-button-icon @click="toast_launch_not_ready()">
+                                <mdui-icon-play-circle></mdui-icon-play-circle>
+                            </mdui-button-icon>
+                        </template>
+                    </sub>
+                </span>
             </mdui-top-app-bar-title>
             <div style="flex-grow: 1"></div>
             <div class="notif-wrap">
+                <mdui-button-icon>
+                    <mdui-icon-settings></mdui-icon-settings>
+                </mdui-button-icon>
                 <mdui-button-icon @click="push('/notifications')">
                     <mdui-icon-notifications></mdui-icon-notifications>
                 </mdui-button-icon>
                 <mdui-badge v-if="unread_count > 0" class="notif-badge">{{ unread_count }}</mdui-badge>
             </div>
         </mdui-top-app-bar>
-        <!--<mdui-layout-item placement="left">
-            <side-bar />
-        </mdui-layout-item>-->
         <mdui-layout-main class="main-page">
             <mdui-button @click="push('/')">/</mdui-button>
             <mdui-button @click="push('/version')">/version</mdui-button>
@@ -53,14 +108,14 @@ function push(route: string) {
     overflow: auto;
 }
 mdui-top-app-bar[variant="large"] {
-    height: 12rem !important;
+    height: 18rem !important;
 }
 mdui-top-app-bar[variant="large"][shrink]:not([shrink="false" i]) {
     height: 4rem !important;
 }
 .mc-avatar {
-    width: 6rem;
-    height: 6rem;
+    width: 8rem;
+    height: 8rem;
     margin-left: 1rem !important;
     aspect-ratio: 1 / 1;
     object-fit: cover;
@@ -70,7 +125,8 @@ mdui-top-app-bar[variant="large"][shrink]:not([shrink="false" i]) {
     flex-shrink: 0;
     transition:
         width var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard),
-        height var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard);
+        height var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard),
+        margin var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard-accelerate);
 }
 mdui-top-app-bar[shrink]:not([shrink="false" i]) .mc-avatar {
     width: 1.875rem;
@@ -86,5 +142,25 @@ mdui-top-app-bar[shrink]:not([shrink="false" i]) .mc-avatar {
     position: absolute;
     top: -2px;
     right: -4px;
+}
+.instance_icon {
+    height: 1rem;
+}
+.create_text {
+    color: rgb(var(--mdui-color-error));
+}
+.label-large-content {
+    display: block;
+    line-height: 1.5;
+}
+.label-large-content mdui-button-icon,
+.label-large-content img,
+.label-large-content sub,
+.label-large-content sub > * {
+    vertical-align: middle;
+}
+.label-large-content mdui-button-icon {
+    vertical-align: middle;
+    transform: translateY(-0.15rem);
 }
 </style>

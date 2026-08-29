@@ -52,11 +52,11 @@ where
 }
 
 pub fn init_logger() {
-    // 读取编译模式
+    // 读取编译模式（压制 reqwest 传输栈 h2/hyper/tower 的 DEBUG 噪音，其它模块保持 DEBUG）
     let log_level = if cfg!(debug_assertions) {
-        "debug"
+        "debug,h2=info,hyper=info,tower=info"
     } else {
-        "info"
+        "info,h2=info,hyper=info,tower=info"
     };
     tracing_subscriber::fmt()
         .with_ansi(true)
