@@ -78,6 +78,7 @@ export interface DownloadProgressPayload {
     fileBytesDone: number;
     fileSize: number;
     reused: boolean;
+    reusedCount: number;
 }
 
 const AUTO_DISMISS_MS: Record<ToastLevel, number> = {
@@ -172,7 +173,7 @@ function pushToast(payload: ToastPayload) {
     schedule_dismiss(item.id, AUTO_DISMISS_MS[payload.level]);
 }
 
-function handleDownloadProgress(p: DownloadProgressPayload) {
+function applyProgress(p: DownloadProgressPayload) {
     const item = find_download(p.versionId);
     if (!item?.download) return;
     const d = item.download;
@@ -184,6 +185,9 @@ function handleDownloadProgress(p: DownloadProgressPayload) {
     d.speed = p.speed;
 
     const ps = d.phases[p.phase];
+    if (p.reusedCount !== undefined) {
+        ps.reusedFiles = p.reusedCount;
+    }
     if (p.finished) {
         ps.doneFiles = p.count;
         ps.totalFiles = p.count;
@@ -196,14 +200,8 @@ function handleDownloadProgress(p: DownloadProgressPayload) {
 
     if (p.name) {
         const percent = p.fileSize > 0 ? Math.min(100, (p.fileBytesDone / p.fileSize) * 100) : 0;
-        if (p.reused) {
-            // 文件已存在于 .minecraft 中，直接复用（跳过下载），不参与前 20 展示
-            ps.reusedFiles += 1;
-            ps.files = ps.files.filter((f) => f.name !== p.name);
-            return;
-        }
-        if (percent >= 100) {
-            // 已完成下载的文件不再占用前 20 的位置
+        if (p.reused || percent >= 100) {
+            // 已复用/已完成下载的文件不参与前 20 展示
             ps.files = ps.files.filter((f) => f.name !== p.name);
             return;
         }
@@ -220,6 +218,32 @@ function handleDownloadProgress(p: DownloadProgressPayload) {
             ps.files.length = MAX_FILES_PER_PHASE;
         }
     }
+}
+
+// 进度事件合并：短时间内的大量事件先缓冲，在下一帧统一应用，避免事件洪泛占满主线程
+const pending_progress: DownloadProgressPayload[] = [];
+let raf_scheduled = false;
+let flush_timer: ReturnType<typeof setTimeout> | undefined;
+
+function flushProgress() {
+    if (!raf_scheduled) return;
+    raf_scheduled = false;
+    if (flush_timer !== undefined) {
+        clearTimeout(flush_timer);
+        flush_timer = undefined;
+    }
+    if (pending_progress.length === 0) return;
+    const events = pending_progress.splice(0, pending_progress.length);
+    for (const p of events) applyProgress(p);
+}
+
+function handleDownloadProgress(p: DownloadProgressPayload) {
+    pending_progress.push(p);
+    if (raf_scheduled) return;
+    raf_scheduled = true;
+    requestAnimationFrame(flushProgress);
+    // 兜底：窗口不可见时 rAF 不触发，用定时器保证进度仍会应用
+    flush_timer = setTimeout(flushProgress, 100);
 }
 
 function cancel_if_downloading(item: ToastItem | undefined) {

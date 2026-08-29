@@ -17,7 +17,7 @@ function push(route: string) {
 <template>
     <mdui-layout class="div">
         <mdui-top-app-bar variant="large" class="title" scroll-behavior="shrink elevate" scroll-target=".main-page">
-            <mdui-avatar src="/src/assets/mc_icon.png"></mdui-avatar>
+            <img class="mc-avatar" src="/src/assets/mc_icon.png" alt="avatar" />
             <mdui-top-app-bar-title>
                 Too Many Minecraft Launcher
                 <span slot="label-large">欢迎！XiaosuLikeJvav</span>
@@ -51,6 +51,32 @@ function push(route: string) {
 .main-page {
     height: 100%;
     overflow: auto;
+}
+mdui-top-app-bar[variant="large"] {
+    height: 12rem !important;
+}
+mdui-top-app-bar[variant="large"][shrink]:not([shrink="false" i]) {
+    height: 4rem !important;
+}
+.mc-avatar {
+    width: 6rem;
+    height: 6rem;
+    margin-left: 1rem !important;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    image-rendering: pixelated;
+    border-radius: var(--mdui-shape-corner-medium);
+    margin-top: 1rem;
+    flex-shrink: 0;
+    transition:
+        width var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard),
+        height var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard);
+}
+mdui-top-app-bar[shrink]:not([shrink="false" i]) .mc-avatar {
+    width: 1.875rem;
+    height: 1.875rem;
+    margin-left: 0 !important;
+    margin-top: 5px !important;
 }
 .notif-wrap {
     position: relative;

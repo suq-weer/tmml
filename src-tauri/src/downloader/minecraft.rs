@@ -51,6 +51,7 @@ pub struct DownloadProgress {
     pub file_bytes_done: u64,
     pub file_size: u64,
     pub reused: bool,
+    pub reused_count: u64,
 }
 
 #[derive(serde::Serialize, Clone, Debug)]
@@ -103,7 +104,9 @@ fn resolve_url(mirror: Option<&str>, kind: TaskKind, official: &str, version_id:
     match kind {
         TaskKind::VersionJson => format!("{}/version/{}/json", mirror, version_id),
         TaskKind::ClientJar => format!("{}/version/{}/client", mirror, version_id),
-        TaskKind::Library | TaskKind::Native => rewrite_path(official, &format!("{}/maven", mirror)),
+        TaskKind::Library | TaskKind::Native => {
+            rewrite_path(official, &format!("{}/maven", mirror))
+        }
         TaskKind::AssetsIndex => rewrite_path(official, mirror),
         TaskKind::Logging => official.to_string(),
         TaskKind::Asset => rewrite_path(official, &format!("{}/assets", mirror)),
@@ -134,15 +137,15 @@ fn rules_allowed(rules: Option<&[Rule]>) -> bool {
     let Some(rules) = rules else {
         return true;
     };
-    let mut allowed = true;
+    let mut allowed: bool = true;
     for rule in rules {
         let os_matches = match &rule.os {
             Some(os) => {
-                let name_ok = match &os.name {
+                let name_ok: bool = match &os.name {
                     Some(name) => name == os_name(),
                     None => true,
                 };
-                let arch_ok = match &os.arch {
+                let arch_ok: bool = match &os.arch {
                     Some(arch) => arch == os_arch(),
                     None => true,
                 };
@@ -171,7 +174,7 @@ fn native_classifier_candidates() -> Vec<String> {
         _ => None,
     };
     if let Some(arch) = arch {
-        let base = candidates[0].clone();
+        let base: String = candidates[0].clone();
         candidates.push(format!("{}-{}", base, arch));
     }
     candidates
@@ -188,10 +191,27 @@ struct PhaseProgress {
     files_done: Arc<AtomicUsize>,
     bytes_done: Arc<AtomicU64>,
     bytes_total: u64,
+    reused: Arc<AtomicUsize>,
+    last_emit: Arc<AtomicU64>,
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 impl PhaseProgress {
-    fn emit(&self, name: String, file_bytes_done: u64, file_size: u64, speed: u64, finished: bool, reused: bool) {
+    fn emit(
+        &self,
+        name: String,
+        file_bytes_done: u64,
+        file_size: u64,
+        speed: u64,
+        finished: bool,
+        reused: bool,
+    ) {
         let index = (self.files_done.load(Ordering::Relaxed) + 1) as u64;
         let bytes_done = self.bytes_done.load(Ordering::Relaxed) + file_bytes_done;
         let payload = DownloadProgress {
@@ -207,10 +227,29 @@ impl PhaseProgress {
             file_bytes_done,
             file_size,
             reused,
+            reused_count: self.reused.load(Ordering::Relaxed) as u64,
         };
         if let Err(e) = self.app.emit(DOWNLOAD_PROGRESS_EVENT, &payload) {
             tracing::warn!("发送下载进度事件失败: {}", e);
         }
+    }
+
+    /// 节流 emit：同一阶段 150ms 内最多 emit 一次，避免复用/完成大量文件时的事件洪泛
+    fn emit_throttled(
+        &self,
+        name: String,
+        file_bytes_done: u64,
+        file_size: u64,
+        speed: u64,
+        finished: bool,
+        reused: bool,
+    ) {
+        let now = now_ms();
+        if now.saturating_sub(self.last_emit.load(Ordering::Relaxed)) < 150 {
+            return;
+        }
+        self.last_emit.store(now, Ordering::Relaxed);
+        self.emit(name, file_bytes_done, file_size, speed, finished, reused);
     }
 }
 
@@ -240,7 +279,11 @@ pub struct MinecraftDownloader {
 
 impl MinecraftDownloader {
     pub fn new(app: AppHandle, config: MainConfig, cancel: Arc<AtomicBool>) -> Self {
-        Self { app, config, cancel }
+        Self {
+            app,
+            config,
+            cancel,
+        }
     }
 
     fn mirror(&self) -> Option<&str> {
@@ -258,11 +301,13 @@ impl MinecraftDownloader {
         Ok(())
     }
 
-    /// 完整流程：查找版本 json → 下载 version.json → 下载客户端/依赖库/资源等
+    /// 完整流程：查找版本 json -> 下载 version.json -> 下载客户端/依赖库/资源等
     pub async fn download_version(&self, version_id: &str) -> Result<VersionContent> {
-        let official_url = self.find_version_url(version_id).await?;
-        let content = self.download_version_json(version_id, &official_url).await?;
-        let tasks = self.build_tasks(&content).await?;
+        let official_url: String = self.find_version_url(version_id).await?;
+        let content: VersionContent = self
+            .download_version_json(version_id, &official_url)
+            .await?;
+        let tasks: Vec<DownloadTask> = self.build_tasks(&content).await?;
         self.run_tasks(version_id, tasks).await?;
         self.download_assets(version_id, &content).await?;
         Ok(content)
@@ -277,7 +322,7 @@ impl MinecraftDownloader {
                 .context("拉取 version_manifest 失败")?;
             provider.ver = Some(manifest);
         }
-        let manifest = provider.ver.as_ref().expect("version_manifest 已加载");
+        let manifest: &VersionManifest = provider.ver.as_ref().expect("version_manifest 已加载");
         match manifest.versions.iter().find(|v| v.id == version_id) {
             Some(version) => Ok(version.url.clone()),
             None => bail!("版本列表中未找到 {}", version_id),
@@ -285,9 +330,20 @@ impl MinecraftDownloader {
     }
 
     /// 下载 <version>.json 到 .minecraft/versions/<id>/<id>.json
-    async fn download_version_json(&self, version_id: &str, official_url: &str) -> Result<VersionContent> {
-        let url = resolve_url(self.mirror(), TaskKind::VersionJson, official_url, version_id);
-        let dest = versions_dir(version_id).await?.join(format!("{}.json", version_id));
+    async fn download_version_json(
+        &self,
+        version_id: &str,
+        official_url: &str,
+    ) -> Result<VersionContent> {
+        let url = resolve_url(
+            self.mirror(),
+            TaskKind::VersionJson,
+            official_url,
+            version_id,
+        );
+        let dest = versions_dir(version_id)
+            .await?
+            .join(format!("{}.json", version_id));
         let progress = PhaseProgress {
             app: self.app.clone(),
             version_id: version_id.to_string(),
@@ -296,6 +352,8 @@ impl MinecraftDownloader {
             files_done: Arc::new(AtomicUsize::new(0)),
             bytes_done: Arc::new(AtomicU64::new(0)),
             bytes_total: 0,
+            reused: Arc::new(AtomicUsize::new(0)),
+            last_emit: Arc::new(AtomicU64::new(0)),
         };
         let task = DownloadTask {
             kind: TaskKind::VersionJson,
@@ -307,7 +365,7 @@ impl MinecraftDownloader {
         };
         self.download_one(&task, &progress, format!("{}.json", version_id))
             .await?;
-        let bytes = fs::read(&dest).await?;
+        let bytes: Vec<u8> = fs::read(&dest).await?;
         let content: VersionContent =
             serde_json::from_slice(&bytes).context("解析 <version>.json 失败")?;
         Ok(content)
@@ -321,7 +379,9 @@ impl MinecraftDownloader {
         let Some(client) = &content.downloads.client else {
             bail!("该版本缺少 downloads.client，无法下载客户端");
         };
-        let jar_dest = versions_dir(version_id).await?.join(format!("{}.jar", version_id));
+        let jar_dest = versions_dir(version_id)
+            .await?
+            .join(format!("{}.jar", version_id));
         tasks.push(DownloadTask {
             kind: TaskKind::ClientJar,
             url: resolve_url(self.mirror(), TaskKind::ClientJar, &client.url, version_id),
@@ -349,7 +409,12 @@ impl MinecraftDownloader {
                     if let Some(native) = classifiers.get(&key) {
                         tasks.push(DownloadTask {
                             kind: TaskKind::Native,
-                            url: resolve_url(self.mirror(), TaskKind::Native, &native.url, version_id),
+                            url: resolve_url(
+                                self.mirror(),
+                                TaskKind::Native,
+                                &native.url,
+                                version_id,
+                            ),
                             dest: libraries_dir()?.join(&native.path),
                             sha1: Some(native.sha1.clone()),
                             size: native.size,
@@ -362,7 +427,9 @@ impl MinecraftDownloader {
         }
 
         let index = &content.assets_index;
-        let index_dest = assets_dir()?.join("indexes").join(format!("{}.json", index.id));
+        let index_dest = assets_dir()?
+            .join("indexes")
+            .join(format!("{}.json", index.id));
         tasks.push(DownloadTask {
             kind: TaskKind::AssetsIndex,
             url: resolve_url(self.mirror(), TaskKind::AssetsIndex, &index.url, version_id),
@@ -376,7 +443,12 @@ impl MinecraftDownloader {
         let logging_dest = assets_dir()?.join("log_configs").join(&logging.file.id);
         tasks.push(DownloadTask {
             kind: TaskKind::Logging,
-            url: resolve_url(self.mirror(), TaskKind::Logging, &logging.file.url, version_id),
+            url: resolve_url(
+                self.mirror(),
+                TaskKind::Logging,
+                &logging.file.url,
+                version_id,
+            ),
             dest: logging_dest,
             sha1: Some(logging.file.sha1.clone()),
             size: logging.file.size,
@@ -401,15 +473,24 @@ impl MinecraftDownloader {
                 _ => {}
             }
         }
-        self.run_phase(version_id, DownloadPhase::ClientJar, clients).await?;
-        self.run_phase(version_id, DownloadPhase::Libraries, libraries).await?;
-        self.run_phase(version_id, DownloadPhase::AssetsIndex, indexes).await?;
-        self.run_phase(version_id, DownloadPhase::Logging, loggings).await?;
+        self.run_phase(version_id, DownloadPhase::ClientJar, clients)
+            .await?;
+        self.run_phase(version_id, DownloadPhase::Libraries, libraries)
+            .await?;
+        self.run_phase(version_id, DownloadPhase::AssetsIndex, indexes)
+            .await?;
+        self.run_phase(version_id, DownloadPhase::Logging, loggings)
+            .await?;
         Ok(())
     }
 
     /// 有界并行的阶段下载
-    async fn run_phase(&self, version_id: &str, phase: DownloadPhase, tasks: Vec<DownloadTask>) -> Result<()> {
+    async fn run_phase(
+        &self,
+        version_id: &str,
+        phase: DownloadPhase,
+        tasks: Vec<DownloadTask>,
+    ) -> Result<()> {
         if tasks.is_empty() {
             return Ok(());
         }
@@ -422,6 +503,8 @@ impl MinecraftDownloader {
             files_done: Arc::new(AtomicUsize::new(0)),
             bytes_done: Arc::new(AtomicU64::new(0)),
             bytes_total,
+            reused: Arc::new(AtomicUsize::new(0)),
+            last_emit: Arc::new(AtomicU64::new(0)),
         };
         let results: Vec<Result<()>> = stream::iter(tasks)
             .map(|task| {
@@ -435,15 +518,20 @@ impl MinecraftDownloader {
         for result in results {
             result?;
         }
+        // 阶段结束：无条件 emit 一次 finished=true，携带累计复用数，保证前端最终状态一致
+        progress.emit(String::new(), 0, 0, 0, true, false);
         Ok(())
     }
 
     /// 下载资源索引后，解析并下载所有资源文件（含 virtual/legacy 副本）
     async fn download_assets(&self, version_id: &str, content: &VersionContent) -> Result<()> {
         let index = &content.assets_index;
-        let index_path = assets_dir()?.join("indexes").join(format!("{}.json", index.id));
+        let index_path = assets_dir()?
+            .join("indexes")
+            .join(format!("{}.json", index.id));
         let data = fs::read(&index_path).await.context("读取资源索引失败")?;
-        let assets_index: AssetsIndexContent = serde_json::from_slice(&data).context("解析资源索引失败")?;
+        let assets_index: AssetsIndexContent =
+            serde_json::from_slice(&data).context("解析资源索引失败")?;
 
         let mut tasks = Vec::new();
         let legacy_root = if assets_index.virtual_ {
@@ -463,12 +551,18 @@ impl MinecraftDownloader {
                 legacy: legacy_root.clone().map(|root| root.join(&legacy_path)),
             });
         }
-        self.run_phase(version_id, DownloadPhase::Assets, tasks).await?;
+        self.run_phase(version_id, DownloadPhase::Assets, tasks)
+            .await?;
         Ok(())
     }
 
     /// 单个文件下载：跳过已存在且大小匹配的文件（复用），失败自动重试
-    async fn download_one(&self, task: &DownloadTask, progress: &PhaseProgress, name: String) -> Result<()> {
+    async fn download_one(
+        &self,
+        task: &DownloadTask,
+        progress: &PhaseProgress,
+        name: String,
+    ) -> Result<()> {
         self.check_cancel()?;
         if file_valid(&task.dest, Some(task.size)).await {
             if let Some(legacy) = &task.legacy {
@@ -476,7 +570,8 @@ impl MinecraftDownloader {
             }
             progress.bytes_done.fetch_add(task.size, Ordering::Relaxed);
             progress.files_done.fetch_add(1, Ordering::Relaxed);
-            progress.emit(name, task.size, task.size, 0, true, true);
+            progress.reused.fetch_add(1, Ordering::Relaxed);
+            progress.emit_throttled(name, task.size, task.size, 0, true, true);
             return Ok(());
         }
 
@@ -495,7 +590,12 @@ impl MinecraftDownloader {
     }
 
     /// 单次下载：流式写入临时文件并实时计算 sha1
-    async fn download_once(&self, task: &DownloadTask, progress: &PhaseProgress, name: String) -> Result<()> {
+    async fn download_once(
+        &self,
+        task: &DownloadTask,
+        progress: &PhaseProgress,
+        name: String,
+    ) -> Result<()> {
         self.check_cancel()?;
         if let Some(parent) = task.dest.parent() {
             fs::create_dir_all(parent).await?;
@@ -527,7 +627,8 @@ impl MinecraftDownloader {
             bytes_since_last += chunk.len() as u64;
 
             if last_emit.elapsed() >= Duration::from_millis(150) {
-                let speed = (bytes_since_last as f64 / last_emit.elapsed().as_secs_f64()).round() as u64;
+                let speed =
+                    (bytes_since_last as f64 / last_emit.elapsed().as_secs_f64()).round() as u64;
                 progress.emit(name.clone(), written, task.size, speed, false, false);
                 last_emit = Instant::now();
                 bytes_since_last = 0;
@@ -539,7 +640,12 @@ impl MinecraftDownloader {
             let digest = hex::encode(hasher.finalize());
             if !digest.eq_ignore_ascii_case(expected) {
                 let _ = fs::remove_file(&tmp).await;
-                bail!("sha1 校验失败: {} (期望 {} 实际 {})", name, expected, digest);
+                bail!(
+                    "sha1 校验失败: {} (期望 {} 实际 {})",
+                    name,
+                    expected,
+                    digest
+                );
             }
         }
 
@@ -550,7 +656,7 @@ impl MinecraftDownloader {
         }
         progress.bytes_done.fetch_add(task.size, Ordering::Relaxed);
         progress.files_done.fetch_add(1, Ordering::Relaxed);
-        progress.emit(name, written, task.size, 0, true, false);
+        progress.emit_throttled(name, written, task.size, 0, true, false);
         Ok(())
     }
 }
@@ -578,14 +684,19 @@ async fn copy_legacy(src: &Path, legacy: &Path) {
         let _ = fs::create_dir_all(parent).await;
     }
     if let Err(e) = fs::copy(src, legacy).await {
-        tracing::warn!("复制资源副本失败 {} -> {}: {}", src.display(), legacy.display(), e);
+        tracing::warn!(
+            "复制资源副本失败 {} -> {}: {}",
+            src.display(),
+            legacy.display(),
+            e
+        );
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::downloader::deserializer::{OS, Rule};
+    use crate::downloader::deserializer::{Rule, OS};
 
     const MIRROR: &str = "https://bmclapi2.bangbang93.com";
 
@@ -606,7 +717,8 @@ mod tests {
 
     #[test]
     fn resolve_asset_to_assets() {
-        let url = "https://resources.download.minecraft.net/b6/b62ca8ec10d07e6bf5ac8dae0c8c1d2e6a1e3356";
+        let url =
+            "https://resources.download.minecraft.net/b6/b62ca8ec10d07e6bf5ac8dae0c8c1d2e6a1e3356";
         assert_eq!(
             resolve_url(Some(MIRROR), TaskKind::Asset, url, "1.21.1"),
             "https://bmclapi2.bangbang93.com/assets/b6/b62ca8ec10d07e6bf5ac8dae0c8c1d2e6a1e3356"
@@ -643,9 +755,20 @@ mod tests {
 
     #[test]
     fn rules_current_os_control() {
-        let os = Some(OS { name: Some(os_name().to_string()), arch: None });
-        let allow = vec![Rule { action: "allow".into(), features: None, os: os.clone() }];
-        let disallow = vec![Rule { action: "disallow".into(), features: None, os }];
+        let os = Some(OS {
+            name: Some(os_name().to_string()),
+            arch: None,
+        });
+        let allow = vec![Rule {
+            action: "allow".into(),
+            features: None,
+            os: os.clone(),
+        }];
+        let disallow = vec![Rule {
+            action: "disallow".into(),
+            features: None,
+            os,
+        }];
         assert!(rules_allowed(Some(&allow)));
         assert!(!rules_allowed(Some(&disallow)));
     }
@@ -659,17 +782,25 @@ mod tests {
     /// 真实文件必须能成功解析为 VersionContent
     #[tokio::test]
     async fn real_version_262_deserializes() {
-        let manifest: VersionManifest =
-            fetch_and_parse_json(VERSION_MANIFEST).await.expect("拉取 version_manifest 失败");
+        let manifest: VersionManifest = fetch_and_parse_json(VERSION_MANIFEST)
+            .await
+            .expect("拉取 version_manifest 失败");
         let entry = manifest
             .versions
             .iter()
             .find(|v| v.id == "26.2")
             .expect("version_manifest 中未找到 26.2");
-        let content: VersionContent =
-            fetch_and_parse_json(&entry.url).await.expect("解析 26.2.json 失败");
+        let content: VersionContent = fetch_and_parse_json(&entry.url)
+            .await
+            .expect("解析 26.2.json 失败");
         assert_eq!(content.id, "26.2");
-        assert!(content.downloads.client.is_some(), "26.2 应有 downloads.client");
-        assert!(content.downloads.client_mappings.is_none(), "26.2 不应有 client_mappings");
+        assert!(
+            content.downloads.client.is_some(),
+            "26.2 应有 downloads.client"
+        );
+        assert!(
+            content.downloads.client_mappings.is_none(),
+            "26.2 不应有 client_mappings"
+        );
     }
 }

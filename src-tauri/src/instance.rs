@@ -17,7 +17,7 @@ pub struct MinecraftInstance {
 }
 
 fn instances_file() -> Result<PathBuf> {
-    Ok(dirs::dot_minecraft()?.join("instances.json"))
+    Ok(dirs::config()?.join("instances.json"))
 }
 
 fn load() -> Result<Vec<MinecraftInstance>> {
