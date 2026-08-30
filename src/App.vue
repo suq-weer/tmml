@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { RouterView, useRouter } from 'vue-router';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import ToastHost from './components/ToastHost.vue';
 import { useToastStore } from './libs/toast';
-import { get_instance_icon, useProfileStore } from './libs/profile';
+import { get_instance_icon, get_profile_avatar, useProfileStore } from './libs/profile';
 import '@mdui/icons/notifications';
 import '@mdui/icons/group.js';
 import '@mdui/icons/checkroom.js';
@@ -15,11 +15,29 @@ const router = useRouter();
 const { notifications, pushToast } = useToastStore();
 const { current, lastLaunched, profiles, refresh } = useProfileStore();
 
+const MC_ICON = '/src/assets/mc_icon.png';
+
 const unread_count = computed(() => notifications.value.length);
 const has_profiles = computed(() => profiles.value.length > 0);
 const current_profile_name = computed(() => current.value?.name ?? profiles.value[0]?.name ?? '');
 
-const instance_icon_src = ref('/src/assets/mc_icon.png');
+const instance_icon_src = ref(MC_ICON);
+const avatar_src = ref(MC_ICON);
+
+async function update_avatar() {
+    const name = current.value?.name;
+    if (!name) {
+        avatar_src.value = MC_ICON;
+        return;
+    }
+    try {
+        const data = await get_profile_avatar(name);
+        avatar_src.value = data ?? MC_ICON;
+    } catch (e) {
+        console.error('获取皮肤头像失败', e);
+        avatar_src.value = MC_ICON;
+    }
+}
 
 function push(route: string) {
     router.push(route)
@@ -29,8 +47,11 @@ function toast_launch_not_ready() {
     pushToast({ level: 'info', title: '启动功能开发中' });
 }
 
+watch(current, update_avatar);
+
 onMounted(async () => {
     await refresh();
+    await update_avatar();
     if (lastLaunched.value) {
         const icon = await get_instance_icon(lastLaunched.value.dir);
         if (icon) instance_icon_src.value = icon;
@@ -41,7 +62,7 @@ onMounted(async () => {
 <template>
     <mdui-layout class="div">
         <mdui-top-app-bar variant="large" class="title" scroll-behavior="shrink elevate" scroll-target=".main-page">
-            <img class="mc-avatar" src="/src/assets/mc_icon.png" alt="avatar" />
+            <img class="mc-avatar" :src="avatar_src" alt="avatar" />
             <mdui-top-app-bar-title>
                 Too Many Minecraft Launcher
                 <span slot="label-large" class="label-large-content">
@@ -91,7 +112,8 @@ onMounted(async () => {
         <mdui-layout-main class="main-page">
             <mdui-button @click="push('/')">/</mdui-button>
             <mdui-button @click="push('/version')">/version</mdui-button>
-            <router-view />
+            <mdui-button @click="push('/instances')">/instances</mdui-button>
+            <div class="route"><router-view /></div>
         </mdui-layout-main>
     </mdui-layout>
     <toast-host />
@@ -104,8 +126,11 @@ onMounted(async () => {
     overflow: hidden;
 }
 .main-page {
-    height: 100%;
+    min-height: 100%;
     overflow: auto;
+}
+.route {
+    min-height: 100vh;
 }
 mdui-top-app-bar[variant="large"] {
     height: 18rem !important;
@@ -126,13 +151,15 @@ mdui-top-app-bar[variant="large"][shrink]:not([shrink="false" i]) {
     transition:
         width var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard),
         height var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard),
-        margin var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard-accelerate);
+        border-radius var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard),
+        margin var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard);
 }
 mdui-top-app-bar[shrink]:not([shrink="false" i]) .mc-avatar {
     width: 1.875rem;
     height: 1.875rem;
     margin-left: 0 !important;
     margin-top: 5px !important;
+    border-radius: 20px;
 }
 .notif-wrap {
     position: relative;

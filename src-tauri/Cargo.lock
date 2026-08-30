@@ -4640,6 +4640,7 @@ dependencies = [
  "directories",
  "futures-util",
  "hex",
+ "png 0.17.16",
  "reqwest",
  "serde",
  "serde_json",

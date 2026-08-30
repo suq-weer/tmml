@@ -5,6 +5,7 @@ pub mod instance;
 pub mod log;
 pub mod profile;
 pub mod runtime;
+pub mod skin;
 pub mod util;
 
 use std::{
@@ -260,6 +261,14 @@ async fn get_current_profile() -> Result<Option<profile::GameProfile>, String> {
     Ok(profile::get_current().await)
 }
 
+/// 获取玩家皮肤的脸部头像（Base64 data URL），查不到皮肤/玩家时返回 null
+#[tauri::command]
+async fn get_profile_avatar(username: String) -> Result<Option<String>, String> {
+    skin::get_profile_avatar(&username)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// 设置默认游戏档案（并立即切换当前档案）；None/空串表示清除
 #[tauri::command]
 async fn set_default_profile(profile_id: Option<String>) -> Result<(), String> {
@@ -411,6 +420,7 @@ pub fn run() {
             list_instances, get_instance, update_instance,
             list_game_profiles, get_game_profile, create_game_profile, delete_game_profile,
             get_current_profile, set_default_profile,
+            get_profile_avatar,
             get_last_launched_instance, record_last_launched_instance,
             get_instance_icon,
             get_main_config, set_main_config

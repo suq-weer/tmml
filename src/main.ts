@@ -11,6 +11,7 @@ import { interceptConsole } from "@fltsci/tauri-plugin-tracing";
 import Notifications from "./pages/Notifications.vue";
 import ProfileManagement from "./pages/ProfileManagement.vue";
 import Home from "./pages/Home.vue";
+import TestInstancesList from "./pages/TestInstancesList.vue";
 
 // 初始化日志系统
 interceptConsole({preserveOriginal: true});
@@ -39,6 +40,7 @@ console.debug("系统深色模式: " + mode.value)
 const routes = [
     { path: "/", component: TestVersionDownload },
     { path: "/version", component: Home },
+    { path: "/instances", component: TestInstancesList },
     { path: "/notifications", component: Notifications },
     { path: "/profiles", component: ProfileManagement }
 ]

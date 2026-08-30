@@ -52,6 +52,10 @@ export function get_last_launched_instance() {
     return invoke<LastLaunchedInstance | null>('get_last_launched_instance');
 }
 
+export function get_profile_avatar(username: string) {
+    return invoke<string | null>('get_profile_avatar', { username });
+}
+
 export function get_instance_icon(dir: string) {
     return invoke<string | null>('get_instance_icon', { dirName: dir });
 }

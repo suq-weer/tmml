@@ -82,8 +82,8 @@ async function remove(id: string) {
                 <div v-for="p in profiles" :key="p.id" class="profile-row">
                     <div class="row-main">
                         <span class="row-name">{{ p.name }}</span>
-                        <mdui-chip variant="assist">{{ p.authType }}</mdui-chip>
-                        <span v-if="is_current(p.id)" class="current-badge">当前</span>
+                        <mdui-badge>{{ p.authType }}</mdui-badge>
+                        <mdui-badge v-if="is_current(p.id)" class="current-badge">当前</mdui-badge>
                     </div>
                     <div class="row-actions">
                         <mdui-button variant="tonal" @click="switch_to(p.id)">切换</mdui-button>
@@ -162,10 +162,7 @@ async function remove(id: string) {
 }
 
 .current-badge {
-    font-size: 12px;
-    padding: 2px 8px;
-    border-radius: var(--mdui-shape-corner-small);
-    background: rgb(var(--mdui-color-primary-container));
+    background-color: rgb(var(--mdui-color-primary-container));
     color: rgb(var(--mdui-color-on-primary-container));
 }
 
