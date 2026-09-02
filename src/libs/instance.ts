@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 export interface InstanceConfig {
     launchCommandPrefix: string[];
     launchCommandSuffix: string[];
+    javaPath?: string | null;
     jvmArgs: string[];
     gameArgs: string[];
     width?: number;

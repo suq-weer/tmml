@@ -26,6 +26,9 @@ pub struct MainConfig {
     pub default_launch_command_prefix: Vec<String>,
     #[serde(default)]
     pub default_launch_command_suffix: Vec<String>,
+    /// 全局默认 java 可执行程序路径（为空时使用 PATH 上的 java）
+    #[serde(default)]
+    pub default_java_path: Option<String>,
     /// 默认游戏档案 id（启动时自动切换到此档案；空表示未设置）
     #[serde(default)]
     pub default_profile_id: Option<String>,
@@ -43,6 +46,7 @@ impl Default for MainConfig {
             default_game_args: Vec::new(),
             default_launch_command_prefix: Vec::new(),
             default_launch_command_suffix: Vec::new(),
+            default_java_path: None,
             default_profile_id: None,
         }
     }
@@ -113,6 +117,7 @@ impl MainConfig {
         InstanceConfig {
             launch_command_prefix: self.default_launch_command_prefix.clone(),
             launch_command_suffix: self.default_launch_command_suffix.clone(),
+            java_path: self.default_java_path.clone(),
             jvm_args: self.default_jvm_args.clone(),
             game_args: self.default_game_args.clone(),
             width: Some(self.default_width),

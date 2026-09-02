@@ -27,6 +27,9 @@ pub struct InstanceConfig {
     /// 启动命令后缀（追加在游戏参数之后）
     #[serde(default)]
     pub launch_command_suffix: Vec<String>,
+    /// java 可执行程序路径（为空时使用 PATH 上的 java）
+    #[serde(default)]
+    pub java_path: Option<String>,
     #[serde(default)]
     pub jvm_args: Vec<String>,
     #[serde(default)]
@@ -234,6 +237,7 @@ fn merge_with_defaults(config: InstanceConfig, defaults: &InstanceConfig) -> Ins
     InstanceConfig {
         launch_command_prefix: pick(config.launch_command_prefix, &defaults.launch_command_prefix),
         launch_command_suffix: pick(config.launch_command_suffix, &defaults.launch_command_suffix),
+        java_path: config.java_path.or_else(|| defaults.java_path.clone()),
         jvm_args: pick(config.jvm_args, &defaults.jvm_args),
         game_args: pick(config.game_args, &defaults.game_args),
         width: config.width.or(defaults.width),

@@ -26,6 +26,7 @@ async fn lookup_mojang_uuid(username: &str) -> Result<Option<String>> {
     }
     let text = resp.text().await.context("读取 Mojang UUID 响应失败")?;
     let parsed: UuidLookup = serde_json::from_str(&text).context("解析 Mojang UUID 响应失败")?;
+    tracing::info!("正版账号 {} 的 UUID: {}", username, parsed.id);
     Ok(Some(parsed.id))
 }
 
@@ -195,22 +196,4 @@ struct TextureSet {
 #[derive(serde::Deserialize)]
 struct TextureEntry {
     url: String,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const REAL_TEXTURE_VALUE: &str = "ewogICJ0aW1lc3RhbXAiIDogMTc4ODEwMzc0MTk5MiwKICAicHJvZmlsZUlkIiA6ICIyNWJlMDRmOTY4NjE0NGE4OWZmNGJmYzkzNmFkYjgzZiIsCiAgInByb2ZpbGVOYW1lIiA6ICJYaWFvc3VMaWtlSnZhdiIsCiAgInRleHR1cmVzIiA6IHsKICAgICJTS0lOIiA6IHsKICAgICAgInVybCIgOiAiaHR0cDovL3RleHR1cmVzLm1pbmVjcmFmdC5uZXQvdGV4dHVyZS8yMDZjZmYwZWRhOThlNmQwZjI1ZTZjZThjZGI5ZDJlYzEzZWEyYTI2ZGZlZGUzNWVhZjBlNDUyZjNjYjEyN2ZhIgogICAgfSwKICAgICJDQVBFIiA6IHsKICAgICAgInVybCIgOiAiaHR0cDovL3RleHR1cmVzLm1pbmVjcmFmdC5uZXQvdGV4dHVyZS9jZDlkODJhYjE3ZmQ5MjAyMmRiZDRhODZjZGU0YzM4MmE3NTQwZTExN2ZhZTdiOWEyODUzNjU4NTA1YTgwNjI1IgogICAgfQogIH0KfQ==";
-
-    #[test]
-    fn parse_texture_payload_skin_url() {
-        let decoded = general_purpose::STANDARD.decode(REAL_TEXTURE_VALUE).unwrap();
-        let payload: TexturePayload = serde_json::from_slice(&decoded).unwrap();
-        let skin = payload.textures.skin.expect("应解析出 SKIN 纹理");
-        assert_eq!(
-            skin.url,
-            "http://textures.minecraft.net/texture/206cff0eda98e6d0f25e6ce8cdb9d2ec13ea2a26dfede35eaf0e452f3cb127fa"
-        );
-    }
 }

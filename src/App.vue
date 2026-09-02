@@ -2,8 +2,11 @@
 import { RouterView, useRouter } from 'vue-router';
 import { computed, onMounted, ref, watch } from 'vue';
 import ToastHost from './components/ToastHost.vue';
+import RunningIslandHost from './components/RunningIslandHost.vue';
 import { useToastStore } from './libs/toast';
 import { get_instance_icon, get_profile_avatar, useProfileStore } from './libs/profile';
+import { launch_backend } from './libs/running';
+import MCIcon from './assets/mc_icon.png';
 import '@mdui/icons/notifications';
 import '@mdui/icons/group.js';
 import '@mdui/icons/checkroom.js';
@@ -15,27 +18,26 @@ const router = useRouter();
 const { notifications, pushToast } = useToastStore();
 const { current, lastLaunched, profiles, refresh } = useProfileStore();
 
-const MC_ICON = '/src/assets/mc_icon.png';
-
 const unread_count = computed(() => notifications.value.length);
 const has_profiles = computed(() => profiles.value.length > 0);
 const current_profile_name = computed(() => current.value?.name ?? profiles.value[0]?.name ?? '');
 
-const instance_icon_src = ref(MC_ICON);
-const avatar_src = ref(MC_ICON);
+const instance_icon_src = ref(MCIcon);
+const avatar_src = ref(MCIcon);
 
 async function update_avatar() {
     const name = current.value?.name;
     if (!name) {
-        avatar_src.value = MC_ICON;
+        avatar_src.value = MCIcon;
         return;
     }
     try {
         const data = await get_profile_avatar(name);
-        avatar_src.value = data ?? MC_ICON;
+        avatar_src.value = data ?? MCIcon;
     } catch (e) {
         console.error('获取皮肤头像失败', e);
-        avatar_src.value = MC_ICON;
+        pushToast({ level: 'error', title: '获取玩家 '+name+' 的皮肤头像失败'})
+        avatar_src.value = MCIcon;
     }
 }
 
@@ -43,15 +45,28 @@ function push(route: string) {
     router.push(route)
 }
 
-function toast_launch_not_ready() {
-    pushToast({ level: 'info', title: '启动功能开发中' });
+function relaunch_last() {
+    const last = lastLaunched.value;
+    if (!last) {
+        pushToast({ level: 'info', title: '最近没有运行任何实例，请先在实例列表启动一个' });
+        return;
+    }
+    launch_backend({
+        id: last.versionId,
+        name: last.name,
+        versionId: last.versionId,
+        path: `versions/${last.dir}`,
+        icon: instance_icon_src.value,
+    }).catch((e) => {
+        console.error('继续启动失败:', e);
+        pushToast({ level: 'error', title: '启动失败', message: String(e) });
+    });
 }
 
-watch(current, update_avatar);
+watch(current, update_avatar, { immediate: true });
 
 onMounted(async () => {
     await refresh();
-    await update_avatar();
     if (lastLaunched.value) {
         const icon = await get_instance_icon(lastLaunched.value.dir);
         if (icon) instance_icon_src.value = icon;
@@ -85,13 +100,13 @@ onMounted(async () => {
                     <sub class="last-launched">
                         <template v-if="lastLaunched">
                             从实例 <img class="instance_icon" :src="instance_icon_src" alt="instance_icon" /> {{ lastLaunched.name }} 继续
-                            <mdui-button-icon @click="toast_launch_not_ready()">
+                            <mdui-button-icon @click="relaunch_last()">
                                 <mdui-icon-play-circle></mdui-icon-play-circle>
                             </mdui-button-icon>
                         </template>
                         <template v-else>
                             最近没有运行任何实例
-                            <mdui-button-icon @click="toast_launch_not_ready()">
+                            <mdui-button-icon @click="relaunch_last()">
                                 <mdui-icon-play-circle></mdui-icon-play-circle>
                             </mdui-button-icon>
                         </template>
@@ -113,10 +128,11 @@ onMounted(async () => {
             <mdui-button @click="push('/')">/</mdui-button>
             <mdui-button @click="push('/version')">/version</mdui-button>
             <mdui-button @click="push('/instances')">/instances</mdui-button>
-            <div class="route"><router-view /></div>
+            <div class="route"><RouterView /></div>
         </mdui-layout-main>
     </mdui-layout>
-    <toast-host />
+    <ToastHost />
+    <RunningIslandHost />
 </template>
 
 <style lang="css">

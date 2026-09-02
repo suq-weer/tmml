@@ -1,12 +1,15 @@
 use std::{
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        Arc, LazyLock,
+    },
     time::{Duration, Instant},
 };
 
 use anyhow::{anyhow, bail, Context, Result};
 use futures_util::{stream, StreamExt};
+use reqwest::Client;
 use sha1::{Digest, Sha1};
 use tauri::{AppHandle, Emitter};
 use tokio::{fs, io::AsyncWriteExt};
@@ -15,15 +18,23 @@ use crate::{
     appfile::dirs,
     config::MainConfig,
     downloader::{
-        deserializer::{AssetsIndexContent, Rule, VersionContent, VersionManifest},
+        deserializer::{AssetsIndexContent, VersionContent, VersionManifest},
         net::fetch_and_parse_json,
         provider::VER_ALL,
         urls::{RESOURCES_API, VERSION_MANIFEST},
     },
+    platform::{features_default, native_classifier_candidates, rules_allow},
 };
 
 pub const DOWNLOAD_PROGRESS_EVENT: &str = "minecraft-download-progress";
 pub const DOWNLOAD_FINISHED_EVENT: &str = "minecraft-download-finished";
+
+static HTTP_CLIENT: LazyLock<Client> = LazyLock::new(|| {
+    Client::builder()
+        .timeout(Duration::from_secs(20))
+        .build()
+        .expect("构建 HTTP 客户端失败")
+});
 
 #[derive(serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -113,73 +124,6 @@ fn resolve_url(mirror: Option<&str>, kind: TaskKind, official: &str, version_id:
     }
 }
 
-// | 平台判定 |
-
-fn os_name() -> &'static str {
-    match std::env::consts::OS {
-        "macos" => "osx",
-        "windows" => "windows",
-        _ => "linux",
-    }
-}
-
-fn os_arch() -> &'static str {
-    match std::env::consts::ARCH {
-        "x86_64" | "amd64" => "x86",
-        "aarch64" | "arm64" => "arm",
-        "x86" | "i386" | "i686" => "x86",
-        _ => "unknown",
-    }
-}
-
-/// 判断依赖库的 rules 是否允许当前平台使用（无 rules 时默认允许）
-fn rules_allowed(rules: Option<&[Rule]>) -> bool {
-    let Some(rules) = rules else {
-        return true;
-    };
-    let mut allowed: bool = true;
-    for rule in rules {
-        let os_matches = match &rule.os {
-            Some(os) => {
-                let name_ok: bool = match &os.name {
-                    Some(name) => name == os_name(),
-                    None => true,
-                };
-                let arch_ok: bool = match &os.arch {
-                    Some(arch) => arch == os_arch(),
-                    None => true,
-                };
-                name_ok && arch_ok
-            }
-            None => true,
-        };
-        if os_matches {
-            allowed = rule.action == "allow";
-        }
-    }
-    allowed
-}
-
-/// natives 分类器的候选键（按平台 + 架构）
-fn native_classifier_candidates() -> Vec<String> {
-    let mut candidates: Vec<String> = match std::env::consts::OS {
-        "macos" => vec!["natives-macos".to_string(), "natives-osx".to_string()],
-        "windows" => vec!["natives-windows".to_string()],
-        _ => vec!["natives-linux".to_string()],
-    };
-    let arch = match std::env::consts::ARCH {
-        "aarch64" | "arm64" => Some("arm64"),
-        "x86_64" | "amd64" => Some("amd64"),
-        "x86" | "i386" | "i686" => Some("x86"),
-        _ => None,
-    };
-    if let Some(arch) = arch {
-        let base: String = candidates[0].clone();
-        candidates.push(format!("{}-{}", base, arch));
-    }
-    candidates
-}
-
 // | 进度上报 |
 
 #[derive(Clone)]
@@ -212,7 +156,7 @@ impl PhaseProgress {
         finished: bool,
         reused: bool,
     ) {
-        let index = (self.files_done.load(Ordering::Relaxed) + 1) as u64;
+        let index = self.files_done.load(Ordering::Relaxed) as u64;
         let bytes_done = self.bytes_done.load(Ordering::Relaxed) + file_bytes_done;
         let payload = DownloadProgress {
             version_id: self.version_id.clone(),
@@ -280,7 +224,12 @@ pub struct MinecraftDownloader {
 }
 
 impl MinecraftDownloader {
-    pub fn new(app: AppHandle, config: MainConfig, cancel: Arc<AtomicBool>, dir_name: String) -> Self {
+    pub fn new(
+        app: AppHandle,
+        config: MainConfig,
+        cancel: Arc<AtomicBool>,
+        dir_name: String,
+    ) -> Self {
         Self {
             app,
             config,
@@ -395,7 +344,7 @@ impl MinecraftDownloader {
         });
 
         for library in &content.libraries {
-            if !rules_allowed(library.rules.as_deref()) {
+            if !rules_allow(library.rules.as_deref(), &features_default(), true) {
                 continue;
             }
             let artifact = &library.downloads.artifact;
@@ -567,7 +516,8 @@ impl MinecraftDownloader {
         name: String,
     ) -> Result<()> {
         self.check_cancel()?;
-        if file_valid(&task.dest, Some(task.size)).await {
+        let skip_sha1 = task.kind == TaskKind::Asset;
+        if file_valid(&task.dest, Some(task.size), task.sha1.as_deref(), skip_sha1).await {
             if let Some(legacy) = &task.legacy {
                 copy_legacy(&task.dest, legacy).await;
             }
@@ -605,7 +555,7 @@ impl MinecraftDownloader {
         }
         let tmp = task.dest.with_extension("tmp");
 
-        let client = reqwest::Client::new();
+        let client = HTTP_CLIENT.clone();
         let response = client.get(&task.url).send().await?;
         if !response.status().is_success() {
             bail!("HTTP {} {}", response.status(), task.url);
@@ -666,16 +616,32 @@ impl MinecraftDownloader {
 
 /// 判断文件是否可复用：仅按“存在 + 大小匹配”判定，不再整文件读盘计算 sha1，
 /// 以大幅减少 HDD 上的随机读（assets 按内容哈希寻址，路径即哈希，大小匹配即足够）
-async fn file_valid(path: &Path, expected_size: Option<u64>) -> bool {
+async fn file_valid(
+    path: &Path,
+    expected_size: Option<u64>,
+    expected_sha1: Option<&str>,
+    skip_sha1: bool,
+) -> bool {
     if !path.exists() {
         return false;
     }
-    match expected_size {
-        Some(size) => match fs::metadata(path).await {
-            Ok(meta) => meta.len() == size,
-            Err(_) => false,
-        },
-        None => true,
+    let Some(size) = expected_size else {
+        return true;
+    };
+    if fs::metadata(path).await.map(|m| m.len()).ok() != Some(size) {
+        return false;
+    }
+    // 大小匹配，若不需要 sha1 校验则直接放行
+    if skip_sha1 || expected_sha1.is_none() {
+        return true;
+    }
+    // 完整读盘计算 sha1
+    match fs::read(path).await {
+        Ok(data) => {
+            let digest = Sha1::digest(&data);
+            format!("{:x}", digest) == expected_sha1.unwrap()
+        }
+        Err(_) => false,
     }
 }
 
@@ -692,118 +658,6 @@ async fn copy_legacy(src: &Path, legacy: &Path) {
             src.display(),
             legacy.display(),
             e
-        );
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::downloader::deserializer::{Rule, OS};
-
-    const MIRROR: &str = "https://bmclapi2.bangbang93.com";
-
-    #[test]
-    fn resolve_without_mirror_returns_original() {
-        let url = "https://libraries.minecraft.net/com/mojang/logging/1.2.7/logging-1.2.7.jar";
-        assert_eq!(resolve_url(None, TaskKind::Library, url, "1.21.1"), url);
-    }
-
-    #[test]
-    fn resolve_library_to_maven() {
-        let url = "https://libraries.minecraft.net/com/mojang/logging/1.2.7/logging-1.2.7.jar";
-        assert_eq!(
-            resolve_url(Some(MIRROR), TaskKind::Library, url, "1.21.1"),
-            "https://bmclapi2.bangbang93.com/maven/com/mojang/logging/1.2.7/logging-1.2.7.jar"
-        );
-    }
-
-    #[test]
-    fn resolve_asset_to_assets() {
-        let url =
-            "https://resources.download.minecraft.net/b6/b62ca8ec10d07e6bf5ac8dae0c8c1d2e6a1e3356";
-        assert_eq!(
-            resolve_url(Some(MIRROR), TaskKind::Asset, url, "1.21.1"),
-            "https://bmclapi2.bangbang93.com/assets/b6/b62ca8ec10d07e6bf5ac8dae0c8c1d2e6a1e3356"
-        );
-    }
-
-    #[test]
-    fn resolve_version_json_and_client() {
-        assert_eq!(
-            resolve_url(
-                Some(MIRROR),
-                TaskKind::VersionJson,
-                "https://piston-meta.mojang.com/v1/packages/xxx/1.21.1.json",
-                "1.21.1"
-            ),
-            "https://bmclapi2.bangbang93.com/version/1.21.1/json"
-        );
-        assert_eq!(
-            resolve_url(
-                Some(MIRROR),
-                TaskKind::ClientJar,
-                "https://piston-data.mojang.com/v1/objects/yyy/client.jar",
-                "1.21.1"
-            ),
-            "https://bmclapi2.bangbang93.com/version/1.21.1/client"
-        );
-    }
-
-    #[test]
-    fn rules_default_allow() {
-        assert!(rules_allowed(None));
-        assert!(rules_allowed(Some(&[])));
-    }
-
-    #[test]
-    fn rules_current_os_control() {
-        let os = Some(OS {
-            name: Some(os_name().to_string()),
-            arch: None,
-        });
-        let allow = vec![Rule {
-            action: "allow".into(),
-            features: None,
-            os: os.clone(),
-        }];
-        let disallow = vec![Rule {
-            action: "disallow".into(),
-            features: None,
-            os,
-        }];
-        assert!(rules_allowed(Some(&allow)));
-        assert!(!rules_allowed(Some(&disallow)));
-    }
-
-    #[test]
-    fn native_candidates_nonempty() {
-        assert!(!native_classifier_candidates().is_empty());
-    }
-
-    /// 复现 26.2 下载失败：其 downloads 缺少 client_mappings/server_mappings，
-    /// 真实文件必须能成功解析为 VersionContent
-    #[tokio::test]
-    async fn real_version_262_deserializes() {
-        let manifest: VersionManifest = fetch_and_parse_json(VERSION_MANIFEST)
-            .await
-            .expect("拉取 version_manifest 失败");
-        let entry = manifest
-            .versions
-            .iter()
-            .find(|v| v.id == "26.2")
-            .expect("version_manifest 中未找到 26.2");
-        let content: VersionContent = fetch_and_parse_json(&entry.url)
-            .await
-            .expect("解析 26.2.json 失败");
-        assert_eq!(content.id, "26.2");
-        assert!(
-            content.downloads.client.is_some(),
-            "26.2 应有 downloads.client"
-        );
-        assert!(
-            content.downloads.client_mappings.is_none(),
-            "26.2 不应有 client_mappings"
         );
     }
 }

@@ -1,20 +1,24 @@
 <script setup lang="ts">
-import '@mdui/icons/arrow-forward';
+import '@mdui/icons/play-arrow.js';
 import '@mdui/icons/file-present.js';
 import { MinecraftInstance } from '../../libs/instance';
 
 const props = defineProps<MinecraftInstance>()
+
+const emit = defineEmits<{
+    (e: 'launch', instance: MinecraftInstance): void
+}>()
 </script>
 
 <template>
-    <mdui-list-item class="card">
+    <mdui-list-item class="card" @click="emit('launch', props)">
         <mdui-avatar src="/src/assets/mc_icon.png"
             slot="icon" class="icon" />
         <div class="text">
             <p class="main-text"><b>{{ props.name }}</b></p>
             <sub><mdui-icon-file-present class="text-icon file-present"></mdui-icon-file-present> {{ props.versionId }}</sub>
         </div>
-        <mdui-icon-arrow-forward slot="end-icon" class="end-icon"></mdui-icon-arrow-forward>
+        <mdui-icon-play-arrow slot="end-icon" class="end-icon"></mdui-icon-play-arrow>
     </mdui-list-item>
 </template>
 

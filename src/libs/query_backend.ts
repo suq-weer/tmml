@@ -11,6 +11,7 @@ export interface MainConfig {
     defaultGameArgs?: string[];
     defaultLaunchCommandPrefix?: string[];
     defaultLaunchCommandSuffix?: string[];
+    defaultJavaPath?: string | null;
 }
 
 export async function fetch_mc_version_paged(size: number = 20, page: number = 1, version_mode: VersionMode = "SNAPSHOT"): Promise<VersionManifest | null> {

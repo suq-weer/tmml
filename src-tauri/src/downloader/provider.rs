@@ -1,16 +1,19 @@
-use futures_util::lock::{Mutex};
-use std::{
-    path::{PathBuf},
-    sync::LazyLock,
-};
-use tokio::fs;
-use tracing::{info, warn};
-use anyhow::bail;
 use crate::{
-    appfile::{dirs::{self}, file}, downloader::{
-        deserializer::{self, FOOL_VERSIONS, SingleVersion, VersionManifest}, net::fetch_and_parse_json, urls::VERSION_MANIFEST,
+    appfile::{
+        dirs::{self},
+        file,
+    },
+    downloader::{
+        deserializer::{self, SingleVersion, VersionManifest, FOOL_VERSIONS},
+        net::fetch_and_parse_json,
+        urls::VERSION_MANIFEST,
     },
 };
+use anyhow::bail;
+use futures_util::lock::Mutex;
+use std::{path::PathBuf, sync::LazyLock};
+use tokio::fs;
+use tracing::{info, warn};
 
 pub struct VersionManifestProvider {
     pub ver: Option<VersionManifest>,
@@ -69,7 +72,6 @@ pub async fn get_minecraft_version_paged(
     }
 
     // 2. 获取数据
-    let mut provider = VER_ALL.lock().await;
     let url: &str = VERSION_MANIFEST;
     let result = match fetch_and_parse_json::<deserializer::VersionManifest>(url).await {
         Ok(data) => data,
@@ -77,6 +79,7 @@ pub async fn get_minecraft_version_paged(
             bail!("获取 version_manifest 失败: {}", e);
         }
     };
+    let mut provider = VER_ALL.lock().await;
     provider.ver = Some(result);
     let path = PathBuf::new()
         .join(dirs::dot_minecraft()?)
@@ -89,7 +92,7 @@ pub async fn get_minecraft_version_paged(
             }
         };
         if let Err(e) = fs::write(&path, json_data).await {
-            bail!("写入磁盘失败: {}", e);
+            warn!("写入磁盘失败: {}", e);
         } else {
             info!(path = ?path, "已成功写入 version_manifest.json");
         }

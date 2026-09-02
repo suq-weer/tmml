@@ -2,7 +2,8 @@ pub mod appfile;
 pub mod config;
 pub mod downloader;
 pub mod instance;
-pub mod log;
+pub mod launcher;
+pub mod platform;
 pub mod profile;
 pub mod runtime;
 pub mod skin;
@@ -67,22 +68,31 @@ async fn get_minecraft_version(
 #[tauri::command]
 async fn get_version() -> Result<deserializer::VersionContent, tauri::Error> {
     // 获取 1.21.1 版本 JSON URL
-    let provider = VER_ALL.lock().await.ver.as_ref().ok_or_else(|| tauri::Error::Anyhow(anyhow::anyhow!("获取不到 version_manifest")))?.clone();
+    let provider = VER_ALL
+        .lock()
+        .await
+        .ver
+        .as_ref()
+        .ok_or_else(|| tauri::Error::Anyhow(anyhow::anyhow!("获取不到 version_manifest")))?
+        .clone();
     for version in &provider.versions {
         if version.id == "1.21.1" {
-            match net::fetch_and_parse_json::<deserializer::VersionContent>(
-                &version.url.to_owned(),
-            )
-            .await
+            match net::fetch_and_parse_json::<deserializer::VersionContent>(&version.url.to_owned())
+                .await
             {
                 Ok(data) => return Ok(data),
                 Err(e) => {
-                    return Err(tauri::Error::Anyhow(anyhow::anyhow!("获取 1.21.1.json 失败: {}", e)));
+                    return Err(tauri::Error::Anyhow(anyhow::anyhow!(
+                        "获取 1.21.1.json 失败: {}",
+                        e
+                    )));
                 }
             };
         }
     }
-    return Err(tauri::Error::Anyhow(anyhow::anyhow!("未找到 1.21.1 (这是一个未预料的错误！)")));
+    return Err(tauri::Error::Anyhow(anyhow::anyhow!(
+        "未找到 1.21.1 (这是一个未预料的错误！)"
+    )));
 }
 
 /// 全局 Toast 事件名，前端通过 listen("toast", ...) 被动接收
@@ -120,16 +130,24 @@ async fn download_minecraft_version(
     );
 
     let cancel = Arc::new(AtomicBool::new(false));
-    DOWNLOAD_CANCELS.lock().await.insert(version_id.clone(), cancel.clone());
+    DOWNLOAD_CANCELS
+        .lock()
+        .await
+        .insert(version_id.clone(), cancel.clone());
 
     let config = MainConfig::get().await;
     let defaults = config.instance_defaults();
     let raw_dir = instance_name.clone().unwrap_or_else(|| version_id.clone());
     let dir_name = {
         let s = instance::sanitize_dir_name(&raw_dir);
-        if s.is_empty() { version_id.clone() } else { s }
+        if s.is_empty() {
+            version_id.clone()
+        } else {
+            s
+        }
     };
-    let downloader = MinecraftDownloader::new(app.clone(), config, cancel.clone(), dir_name.clone());
+    let downloader =
+        MinecraftDownloader::new(app.clone(), config, cancel.clone(), dir_name.clone());
     let result = downloader.download_version(&version_id).await;
     let cancelled = cancel.load(Ordering::Relaxed);
     DOWNLOAD_CANCELS.lock().await.remove(&version_id);
@@ -149,7 +167,13 @@ async fn download_minecraft_version(
     } else {
         match result {
             Ok(_) => {
-                if let Err(e) = instance::create(&version_id, instance_name, instance_config, &defaults, &dir_name) {
+                if let Err(e) = instance::create(
+                    &version_id,
+                    instance_name,
+                    instance_config,
+                    &defaults,
+                    &dir_name,
+                ) {
                     tracing::warn!("创建实例失败: {}", e);
                 }
                 (
@@ -297,7 +321,9 @@ async fn set_default_profile(profile_id: Option<String>) -> Result<(), String> {
 /// 获取最后一次启动的实例记录（可能为 null）
 #[tauri::command]
 async fn get_last_launched_instance() -> Result<Option<runtime::LastLaunchedInstance>, String> {
-    runtime::get_last_launched().await.map_err(|e| e.to_string())
+    runtime::get_last_launched()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// 记录最后一次启动的实例（供未来启动模块调用）
@@ -341,6 +367,7 @@ struct MainConfigUpdate {
     default_game_args: Option<Vec<String>>,
     default_launch_command_prefix: Option<Vec<String>>,
     default_launch_command_suffix: Option<Vec<String>>,
+    default_java_path: Option<String>,
     default_profile_id: Option<String>,
 }
 
@@ -379,6 +406,13 @@ async fn set_main_config(update: MainConfigUpdate) -> Result<MainConfig, String>
         if let Some(args) = update.default_launch_command_suffix {
             config.default_launch_command_suffix = args;
         }
+        if let Some(java) = update.default_java_path {
+            config.default_java_path = if java.trim().is_empty() {
+                None
+            } else {
+                Some(java.trim().to_string())
+            };
+        }
         if let Some(profile) = update.default_profile_id {
             config.default_profile_id = if profile.trim().is_empty() {
                 None
@@ -414,17 +448,33 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_system_color,
-            get_minecraft_version, get_version,
+            get_minecraft_version,
+            get_version,
             download_minecraft_version,
             cancel_minecraft_download,
-            list_instances, get_instance, update_instance,
-            list_game_profiles, get_game_profile, create_game_profile, delete_game_profile,
-            get_current_profile, set_default_profile,
+            list_instances,
+            get_instance,
+            update_instance,
+            list_game_profiles,
+            get_game_profile,
+            create_game_profile,
+            delete_game_profile,
+            get_current_profile,
+            set_default_profile,
             get_profile_avatar,
-            get_last_launched_instance, record_last_launched_instance,
+            get_last_launched_instance,
+            record_last_launched_instance,
             get_instance_icon,
-            get_main_config, set_main_config
+            launcher::launch_minecraft,
+            launcher::stop_minecraft_session,
+            get_main_config,
+            set_main_config
         ])
-        .run(tauri::generate_context!())
-        .expect("运行 Tauri 框架时遇到错误");
+        .build(tauri::generate_context!())
+        .expect("初始化 Tauri 框架时遇到错误")
+        .run(|_app, event| {
+            if matches!(event, tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }) {
+                crate::launcher::kill_all_sessions();
+            }
+        });
 }

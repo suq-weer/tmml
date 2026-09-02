@@ -30,8 +30,9 @@ futures-util = "0.3.33"
 anyhow = "1.0.104"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt", "ansi"] }
-time = { version = "0.3.55", features = ["formatting", "macros"] }
+time = { version = "0.3.55", features = ["formatting", "macros", "local-offset"] }
 tauri-plugin-fs = "2"
+portable-pty = "0.8"
 directories = "6.0.0"
 tauri-plugin-tracing = "0.3.4"
 sha1 = "0.10"

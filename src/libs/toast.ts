@@ -216,7 +216,7 @@ function applyProgress(p: DownloadProgressPayload) {
         ps.finished = true;
     } else {
         ps.totalFiles = p.count;
-        ps.doneFiles = Math.max(ps.doneFiles, Math.min(p.index - 1, p.count));
+        ps.doneFiles = Math.max(ps.doneFiles, Math.min(p.index, p.count));
         ps.finished = false;
     }
 

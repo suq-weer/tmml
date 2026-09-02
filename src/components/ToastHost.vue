@@ -6,15 +6,22 @@ import '@mdui/icons/error--outlined.js';
 import '@mdui/icons/close.js';
 import { listen } from '@tauri-apps/api/event';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRunningStore } from '../libs/running';
 import {
     DownloadProgressPayload, ToastItem, ToastLevel, ToastPayload, useToastStore,
 } from '../libs/toast';
 
 const { toasts, pushToast, dismissToast, handleDownloadProgress } = useToastStore();
+const { dockClearance } = useRunningStore();
 
 const TOAST_CARD_HEIGHT = 96;
 const MARGIN = 16;
 const viewport_height = ref(window.innerHeight);
+
+/** 底部偏移：为底部胶囊 Dock 让出空间 */
+const toast_bottom = computed(() =>
+    dockClearance.value > 0 ? Math.max(dockClearance.value, 16) : 16
+);
 
 function on_resize() {
     viewport_height.value = window.innerHeight;
@@ -87,7 +94,7 @@ function download_percent(t: ToastItem): number {
 </script>
 
 <template>
-    <div class="toast-host">
+    <div class="toast-host" :style="{ bottom: toast_bottom + 'px' }">
         <transition-group name="toast" tag="div" class="toast-stack">
             <mdui-card
                 v-for="t in visible_toasts"
@@ -122,9 +129,9 @@ function download_percent(t: ToastItem): number {
 .toast-host {
     position: fixed;
     right: 16px;
-    bottom: 16px;
     z-index: 2000;
     pointer-events: none;
+    transition: bottom 0.3s var(--mdui-motion-easing-standard);
 }
 
 .toast-stack {
