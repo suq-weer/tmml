@@ -4,26 +4,42 @@
 
 ## 介绍
 
-> 注：目前项目仍作为空壳，还不能实现完整的 Minecraft 启动器体验
+> <del>_注：目前项目仍作为空壳，还不能实现完整的 Minecraft 启动器体验_</del>
+>
+> 已完成启动功能，现在正在进行 UI 交互设计，完善启动器体验中。
+
 ### 正在实现
 
 #### 后端
 
+##### 离线登录+启动 Minecraft
+
 - [x] 原版较新版本 Minecraft 下载
-- [ ] Minecraft 实例管理
-- [ ] 游戏档案管理
-- [ ] JVM 参数生成
-- [ ] Minecraft 启动（离线）
+- [x] Minecraft 实例管理
+- [x] 游戏档案管理
+- [x] JVM 参数生成
+- [x] Minecraft 启动（离线）
+
+##### ModLoader 适配
+
+- [ ] NeoForge 加载器安装
+- [ ] Fabric 加载器安装
+- [ ] Fabric Api 附带安装
+- [ ] Forge 加载器安装
+- [ ] 一键安装信雅互联版本
 
 #### 前端
+
 - [x] MC 下载进度监测
 - [ ] UI 初步设计
+- [ ] Modrinth api 适配
+- [ ] Curseforge api 适配
 
 ## 推荐的 IDE 配置
 
 本项目建议使用 [VS Code](https://code.visualstudio.com/) 开发，安装工作区所有的建议插件可获得最佳开发体验。
 
-> 建议使用 bun 作为包管理器
+> 建议使用 `bun` 作为包管理器，且 `rustup` 1.97.1 版本以上
 
 ### 建议的插件
 
