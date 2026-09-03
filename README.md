@@ -57,4 +57,12 @@
 
 ## 部分素材来源
 
+### 图片素材
+
 - Minecraft 草方块与泥土：[Minecraft 中文 Wiki](https://zh.minecraft.wiki/)
+- Tauri 默认 Logo
+
+### 嵌入字体
+
+- 界面字体：[MiSans](https://hyperos.mi.com/font) (请查阅 [LICENSE.pdf](/src/assets/fonts/mi/LICENSE.pdf))
+- 代码/等宽字体：[JetBrains Mono Nerd Font](https://www.jetbrains.com/lp/mono/)（[Nerd Font 项目](https://www.nerdfonts.com/)，请查阅 [README.md](/src/assets/fonts/jb/README.md)）

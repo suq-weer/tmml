@@ -602,7 +602,7 @@ fn spawn_and_run(app: &AppHandle, b: &SessionBundle, command: LaunchCommand) {
             } else {
                 (
                     Some(status.exit_code() as i32),
-                    format!("Minecraft 异常退出：{}", status),
+                    format!("（请不要直接上传窗口内容）Minecraft 异常退出：{}", status),
                 )
             }
         }

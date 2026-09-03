@@ -3,15 +3,16 @@ import App from "./App.vue";
 import { invoke } from '@tauri-apps/api/core';
 import 'mdui/mdui.css';
 import 'mdui';
+import "./assets/fonts/fonts.css";
 import { setColorScheme } from "mdui";
 import { useDark } from "@vueuse/core";
 import { createMemoryHistory, createRouter } from "vue-router";
-import TestVersionDownload from "./pages/TestVersionDownload.vue";
+import TestVersionDownload from "./pages/test/TestVersionDownload.vue";
 import { interceptConsole } from "@fltsci/tauri-plugin-tracing";
 import Notifications from "./pages/Notifications.vue";
 import ProfileManagement from "./pages/ProfileManagement.vue";
+import TestVersionList from "./pages/test/TestVersionList.vue";
 import Home from "./pages/Home.vue";
-import TestInstancesList from "./pages/TestInstancesList.vue";
 
 // 初始化日志系统
 interceptConsole({preserveOriginal: true});
@@ -38,9 +39,9 @@ console.debug("系统深色模式: " + mode.value)
 
 // 路由创建
 const routes = [
-    { path: "/", component: TestVersionDownload },
-    { path: "/version", component: Home },
-    { path: "/instances", component: TestInstancesList },
+    { path: "/", component: Home },
+    { path: "/download", component: TestVersionDownload },
+    { path: "/version", component: TestVersionList },
     { path: "/notifications", component: Notifications },
     { path: "/profiles", component: ProfileManagement }
 ]

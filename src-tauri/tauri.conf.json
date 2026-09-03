@@ -13,8 +13,10 @@
     "windows": [
       {
         "title": "Too Many Minecraft Launcher",
-        "width": 1280,
-        "height": 720
+        "width": 640,
+        "height": 480,
+        "minWidth": 540,
+        "minHeight": 600
       }
     ],
     "security": {

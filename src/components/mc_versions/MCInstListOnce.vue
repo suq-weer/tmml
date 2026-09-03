@@ -11,7 +11,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <mdui-list-item class="card" @click="emit('launch', props)">
+    <mdui-list-item class="instance-list-item" @click="emit('launch', props)">
         <mdui-avatar src="/src/assets/mc_icon.png"
             slot="icon" class="icon" />
         <div class="text">
@@ -22,14 +22,14 @@ const emit = defineEmits<{
     </mdui-list-item>
 </template>
 
-<style lang="css">
-.card {
+<style lang="css" scoped>
+.instance-list-item {
     .end-icon {
         display: none;
     }
 }
 
-.card:hover {
+.instance-list-item:hover {
     .end-icon {
         display: block;
     }

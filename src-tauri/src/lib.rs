@@ -36,6 +36,44 @@ use tauri_plugin_tracing::LevelFilter;
 static DOWNLOAD_CANCELS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// 首页「系统资源」卡片用：返回最近一次轮询间隔内的平均 CPU 占用与内存情况
+#[derive(serde::Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct SystemStats {
+    /// 最近一次采样周期内的平均 CPU 占用率（0~100）
+    cpu_usage: f32,
+    /// 物理内存总量（字节）
+    total_mem: u64,
+    /// 已使用物理内存（字节）
+    used_mem: u64,
+    /// 逻辑核心数
+    cpu_count: usize,
+}
+
+#[tauri::command]
+fn get_system_stats() -> Result<SystemStats, String> {
+    use std::sync::Mutex;
+
+    static SYSTEM: LazyLock<Mutex<sysinfo::System>> =
+        LazyLock::new(|| Mutex::new(sysinfo::System::new()));
+
+    let mut sys = SYSTEM
+        .lock()
+        .map_err(|e| format!("获取系统状态锁失败: {e}"))?;
+
+    sys.refresh_memory();
+    // CPU 占用需要以两次刷新之间的时间差为采样周期计算，
+    // 首次调用会建立基线，此后返回的即是距上次轮询的平均占用率。
+    sys.refresh_cpu_usage();
+
+    Ok(SystemStats {
+        cpu_usage: sys.global_cpu_usage(),
+        total_mem: sys.total_memory(),
+        used_mem: sys.used_memory(),
+        cpu_count: sys.cpus().len(),
+    })
+}
+
 #[tauri::command]
 async fn get_system_color() -> anyhow::Result<String, String> {
     let theme = SystemTheme::new().map_err(|e| format!("获取系统主题失败: {}", e))?;
@@ -448,6 +486,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_system_color,
+            get_system_stats,
             get_minecraft_version,
             get_version,
             download_minecraft_version,
