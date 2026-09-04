@@ -24,6 +24,7 @@ use crate::{
         minecraft::{DownloadFinished, MinecraftDownloader, DOWNLOAD_FINISHED_EVENT},
         net,
         provider::{get_minecraft_version_paged, VersionMode, VersionPage, VER_ALL},
+        provider::{get_minecraft_version_paged, VersionMode, VersionPage, VER_ALL},
     },
     util::theme_color_to_hex,
 };
@@ -86,7 +87,7 @@ async fn get_system_color() -> anyhow::Result<String, String> {
     Ok(accent_color)
 }
 
-/// 分页获取我的世界版本列表：返回本页切片与分页元信息（total/hasMore 等）
+/// 分页获取我的世界版本列表
 #[tauri::command]
 async fn get_minecraft_version(
     size: Option<u32>,
@@ -94,10 +95,14 @@ async fn get_minecraft_version(
     version_mode: Option<VersionMode>,
 ) -> Result<VersionPage, String> {
     get_minecraft_version_paged(
+) -> Result<VersionPage, String> {
+    get_minecraft_version_paged(
         size.unwrap_or(20),
         page.unwrap_or(1),
         version_mode.unwrap_or(VersionMode::ALL),
     )
+    .await
+    .map_err(|e| e.to_string())
     .await
     .map_err(|e| e.to_string())
 }
@@ -512,7 +517,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("初始化 Tauri 框架时遇到错误")
         .run(|_app, event| {
-            if matches!(event, tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }) {
+            if matches!(
+                event,
+                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }
+            ) {
                 crate::launcher::kill_all_sessions();
             }
         });
