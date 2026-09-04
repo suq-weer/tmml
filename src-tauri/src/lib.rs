@@ -95,14 +95,10 @@ async fn get_minecraft_version(
     version_mode: Option<VersionMode>,
 ) -> Result<VersionPage, String> {
     get_minecraft_version_paged(
-) -> Result<VersionPage, String> {
-    get_minecraft_version_paged(
         size.unwrap_or(20),
         page.unwrap_or(1),
         version_mode.unwrap_or(VersionMode::ALL),
     )
-    .await
-    .map_err(|e| e.to_string())
     .await
     .map_err(|e| e.to_string())
 }
