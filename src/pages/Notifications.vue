@@ -94,7 +94,9 @@ function fmt_time(ts: number): string {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px clamp(16px, 4vw, 32px) 48px;
 }
 
 .head {

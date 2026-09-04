@@ -23,7 +23,7 @@ use crate::{
         deserializer,
         minecraft::{DownloadFinished, MinecraftDownloader, DOWNLOAD_FINISHED_EVENT},
         net,
-        provider::{get_minecraft_version_paged, VersionMode, VER_ALL},
+        provider::{get_minecraft_version_paged, VersionMode, VersionPage, VER_ALL},
     },
     util::theme_color_to_hex,
 };
@@ -86,20 +86,20 @@ async fn get_system_color() -> anyhow::Result<String, String> {
     Ok(accent_color)
 }
 
-/// 获取我的世界版本列表，默认一页 20 个版本，返回第 1 页
+/// 分页获取我的世界版本列表：返回本页切片与分页元信息（total/hasMore 等）
 #[tauri::command]
 async fn get_minecraft_version(
     size: Option<u32>,
     page: Option<u32>,
     version_mode: Option<VersionMode>,
-) -> Result<deserializer::VersionManifest, tauri::Error> {
-    let result = get_minecraft_version_paged(
+) -> Result<VersionPage, String> {
+    get_minecraft_version_paged(
         size.unwrap_or(20),
         page.unwrap_or(1),
         version_mode.unwrap_or(VersionMode::ALL),
     )
-    .await?;
-    Ok(result)
+    .await
+    .map_err(|e| e.to_string())
 }
 
 /// 获取 1.21.1 的版本 JSON

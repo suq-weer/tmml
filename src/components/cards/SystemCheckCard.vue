@@ -73,7 +73,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <mdui-card variant="outlined" class="card">
+  <mdui-card variant="outlined" class="float-hover-card">
     <div class="card-head">
       <mdui-icon-memory--outlined
         class="card-icon"
@@ -152,7 +152,7 @@ onUnmounted(() => {
 }
 
 .card-title {
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .card-sub {

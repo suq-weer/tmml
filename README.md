@@ -59,7 +59,7 @@
 
 ### 图片素材
 
-- Minecraft 草方块与泥土：[Minecraft 中文 Wiki](https://zh.minecraft.wiki/)
+- Minecraft 草方块与泥土、Steve 皮肤头像：[Minecraft 中文 Wiki](https://zh.minecraft.wiki/)
 - Tauri 默认 Logo
 
 ### 嵌入字体

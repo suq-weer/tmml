@@ -563,7 +563,6 @@ function fmtElapsed(ms: number) {
 
 /** 状态末行文案：运行中显示运行时长，结束时展示退出/失败原因 */
 function statusHint(s: RunningSession) {
-  console.log(s);
   if (s.status === "error") return s.message ?? "启动失败";
   if (s.status === "exited")
     return s.message ?? `已退出（代码 ${s.exitCode ?? "?"}）`;
@@ -674,8 +673,9 @@ function statusHint(s: RunningSession) {
                   v-for="(line, i) in logsBySid[contentSession.id] ?? []"
                   :key="i"
                   class="log-line"
-                  v-html="renderLogLine(line.text, line.kind)"
-                ></p>
+                >
+                  <code v-html="renderLogLine(line.text, line.kind)" />
+                </p>
                 <p
                   v-if="(logsBySid[contentSession.id] ?? []).length === 0"
                   class="log-empty"

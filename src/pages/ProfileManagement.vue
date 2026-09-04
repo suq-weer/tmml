@@ -75,7 +75,7 @@ async function remove(id: string) {
       </p>
     </header>
 
-    <mdui-card variant="outlined" class="card">
+    <mdui-card variant="outlined" class="card float-hover-card">
       <div class="card-title">新建离线档案</div>
       <div class="create-row">
         <mdui-text-field
@@ -90,7 +90,7 @@ async function remove(id: string) {
       </div>
     </mdui-card>
 
-    <mdui-card variant="outlined" class="card">
+    <mdui-card variant="outlined" class="card float-hover-card">
       <div class="card-title">档案列表</div>
       <template v-if="profiles.length > 0">
         <mdui-divider></mdui-divider>

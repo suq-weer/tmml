@@ -4,7 +4,7 @@ import InstancesList from "../InstancesList.vue";
 </script>
 
 <template>
-  <mdui-card variant="outlined" class="card">
+  <mdui-card variant="outlined" class="float-hover-card">
     <div class="card-head">
       <mdui-icon-apps--outlined class="card-icon"></mdui-icon-apps--outlined>
       <div>
@@ -12,7 +12,7 @@ import InstancesList from "../InstancesList.vue";
         <div class="card-sub">点击实例卡片即可启动游戏</div>
       </div>
       <div style="flex-grow: 1" />
-      <mdui-button @click="$router.push('/download')">新建实例</mdui-button>
+      <mdui-button @click="$router.push('/download')">前往下载页</mdui-button>
     </div>
     <mdui-divider></mdui-divider>
     <div class="card-body flush">
@@ -35,7 +35,7 @@ import InstancesList from "../InstancesList.vue";
 }
 
 .card-title {
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .card-sub {

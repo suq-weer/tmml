@@ -1,0 +1,10 @@
+.float-hover-card {
+    border-color: rgb(var(--mdui-color-outline));
+    box-shadow: var(--mdui-elevation-level1);
+    transition: border-color var(--mdui-motion-duration-medium4) var(--mdui-motion-easing-standard);
+}
+
+.float-hover-card:hover {
+    border-color: rgb(var(--mdui-color-primary));
+    box-shadow: var(--mdui-elevation-level5);
+}

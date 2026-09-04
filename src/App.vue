@@ -11,6 +11,7 @@ import {
 } from "./libs/profile";
 import { launch_backend } from "./libs/running";
 import MCIcon from "./assets/mc_icon.png";
+import SteveIcon from "./assets/steve.png";
 import "@mdui/icons/notifications";
 import "@mdui/icons/group.js";
 import "@mdui/icons/checkroom.js";
@@ -24,17 +25,30 @@ const { current, lastLaunched, profiles, refresh } = useProfileStore();
 
 const unread_count = computed(() => notifications.value.length);
 const has_profiles = computed(() => profiles.value.length > 0);
+const transitionName = ref<"push" | "pop">("push");
+
+let navigationDirection: "push" | "pop" = "push";
+
+router.options.history.listen((_to, _from, info) => {
+  navigationDirection = info.delta < 0 ? "pop" : "push";
+});
+
+router.afterEach(() => {
+  transitionName.value = navigationDirection;
+  navigationDirection = "push";
+});
+
 const current_profile_name = computed(
   () => current.value?.name ?? profiles.value[0]?.name ?? "",
 );
 
 const instance_icon_src = ref(MCIcon);
-const avatar_src = ref(MCIcon);
+const avatar_src = ref(SteveIcon);
 
 async function update_avatar() {
   const name = current.value?.name;
   if (!name) {
-    avatar_src.value = MCIcon;
+    avatar_src.value = SteveIcon;
     return;
   }
   try {
@@ -46,7 +60,7 @@ async function update_avatar() {
       level: "error",
       title: "获取玩家 " + name + " 的皮肤头像失败",
     });
-    avatar_src.value = MCIcon;
+    avatar_src.value = SteveIcon;
   }
 }
 
@@ -105,7 +119,7 @@ onMounted(async () => {
             </mdui-button-icon>
             <mdui-button-icon
               @click="
-                pushToast({ level: 'info', title: '皮肤更换功能尽请期待~' })
+                pushToast({ level: 'info', title: '皮肤更换功能敬请期待~' })
               "
             >
               <mdui-icon-checkroom></mdui-icon-checkroom>
@@ -154,7 +168,16 @@ onMounted(async () => {
       </div>
     </mdui-top-app-bar>
     <mdui-layout-main class="main-page">
-      <div class="route"><RouterView /></div>
+      <div class="route">
+        <RouterView v-slot="{ Component, route: viewRoute }">
+          <Transition :name="transitionName">
+            <component
+              :is="Component"
+              :key="viewRoute.matched[0]?.path ?? viewRoute.path"
+            />
+          </Transition>
+        </RouterView>
+      </div>
     </mdui-layout-main>
   </mdui-layout>
   <ToastHost />
@@ -172,7 +195,45 @@ onMounted(async () => {
   overflow: auto;
 }
 .route {
+  position: relative;
   min-height: 100vh;
+  overflow-x: clip;
+}
+.push-enter-active,
+.push-leave-active,
+.pop-enter-active,
+.pop-leave-active {
+  transition:
+    transform var(--mdui-motion-duration-long2)
+      var(--mdui-motion-easing-emphasized),
+    opacity var(--mdui-motion-duration-long2)
+      var(--mdui-motion-easing-emphasized);
+}
+.push-enter-active {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+.push-enter-from {
+  transform: translateX(150%);
+}
+.push-leave-to {
+  transform: translateX(-150%);
+  opacity: 0;
+}
+.pop-leave-active {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+.pop-enter-from {
+  transform: translateX(-150%);
+  opacity: 0;
+}
+.pop-leave-to {
+  transform: translateX(150%);
 }
 mdui-top-app-bar[variant="large"] {
   height: 18rem !important;
@@ -190,6 +251,7 @@ mdui-top-app-bar[variant="large"][shrink]:not([shrink="false" i]) {
   border-radius: var(--mdui-shape-corner-medium);
   margin-top: 1rem;
   flex-shrink: 0;
+  box-shadow: var(--mdui-elevation-level5);
   transition:
     width var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard),
     height var(--mdui-motion-duration-short4) var(--mdui-motion-easing-standard),

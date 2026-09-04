@@ -18,6 +18,16 @@ export interface SingleVersion {
 
 export type VersionMode = "ALL" | "RELEASE" | "SNAPSHOT" | "FOOL";
 
+export interface VersionPage {
+    latest: LatestVersion,
+    versions: SingleVersion[],
+    page: number,
+    size: number,
+    total: number,
+    totalPages: number,
+    hasMore: boolean
+}
+
 // ========== version.json 解析 ==========
 
 export interface VersionContent {

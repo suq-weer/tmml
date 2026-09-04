@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import DoYouKnowCard from "../components/cards/DoYouKnowCard.vue";
 import InstancesListCard from "../components/cards/InstancesListCard.vue";
 import SystemCheckCard from "../components/cards/SystemCheckCard.vue";
 </script>
@@ -19,6 +20,7 @@ import SystemCheckCard from "../components/cards/SystemCheckCard.vue";
       <!-- ===================== 右栏：辅助工具区 ===================== -->
       <aside class="column column-right">
         <SystemCheckCard />
+        <DoYouKnowCard />
       </aside>
     </div>
   </div>
