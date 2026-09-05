@@ -23,8 +23,7 @@ use crate::{
         deserializer,
         minecraft::{DownloadFinished, MinecraftDownloader, DOWNLOAD_FINISHED_EVENT},
         net,
-        provider::{get_minecraft_version_paged, VersionMode, VersionPage, VER_ALL},
-        provider::{get_minecraft_version_paged, VersionMode, VersionPage, VER_ALL},
+        provider::{get_minecraft_version_paged, VersionMode, VersionPage, VER_ALL}
     },
     util::theme_color_to_hex,
 };
