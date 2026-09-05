@@ -13,12 +13,12 @@ import SystemCheckCard from "../components/cards/SystemCheckCard.vue";
 
     <div class="dashboard">
       <!-- ===================== 左栏：主要内容区 ===================== -->
-      <section class="column column-left">
+      <section class="column">
         <InstancesListCard />
       </section>
 
       <!-- ===================== 右栏：辅助工具区 ===================== -->
-      <aside class="column column-right">
+      <aside class="column">
         <SystemCheckCard />
         <DoYouKnowCard />
       </aside>

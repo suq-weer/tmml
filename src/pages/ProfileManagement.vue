@@ -143,6 +143,7 @@ async function remove(id: string) {
 
 .page-desc {
   margin: 0;
+  margin-left: 3rem !important;
   color: rgb(var(--mdui-color-on-surface-variant));
 }
 

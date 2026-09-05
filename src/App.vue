@@ -72,8 +72,9 @@ function relaunch_last() {
   const last = lastLaunched.value;
   if (!last) {
     pushToast({
-      level: "info",
+      level: "warning",
       title: "最近没有运行任何实例，请先在实例列表启动一个",
+      message: "注意：此 Toast 出现可能是一个未预料的现象",
     });
     return;
   }
@@ -111,48 +112,59 @@ onMounted(async () => {
       <img class="mc-avatar" :src="avatar_src" alt="avatar" />
       <mdui-top-app-bar-title>
         Too Many Minecraft Launcher
-        <span slot="label-large" class="label-large-content">
+        <mdui-card slot="label-large" class="label-large-content">
           <template v-if="has_profiles">
-            欢迎！{{ current_profile_name }}
-            <mdui-button-icon @click="push('/profiles')">
-              <mdui-icon-group></mdui-icon-group>
-            </mdui-button-icon>
-            <mdui-button-icon
-              @click="
-                pushToast({ level: 'info', title: '皮肤更换功能敬请期待~' })
-              "
-            >
-              <mdui-icon-checkroom></mdui-icon-checkroom>
-            </mdui-button-icon>
+            <div class="label">
+              欢迎！{{ current_profile_name }}
+              <div style="flex-grow: 1" />
+              <mdui-button @click="push('/profiles')" variant="elevated">
+                <mdui-icon-group slot="icon"></mdui-icon-group>
+                档案管理
+              </mdui-button>
+              <mdui-button
+                @click="
+                  pushToast({ level: 'info', title: '皮肤更换功能敬请期待~' })
+                "
+                variant="elevated"
+              >
+                <mdui-icon-checkroom slot="icon"></mdui-icon-checkroom>
+                更换皮肤
+              </mdui-button>
+            </div>
           </template>
           <template v-else>
             <span class="create_text">请新建一个用户档案</span>
-            <mdui-button-icon @click="push('/profiles')">
-              <mdui-icon-person-add-alt-1></mdui-icon-person-add-alt-1>
-            </mdui-button-icon>
+            <mdui-button @click="push('/profiles')" variant="elevated">
+              <mdui-icon-person-add-alt-1
+                slot="icon"
+              ></mdui-icon-person-add-alt-1>
+              新建档案
+            </mdui-button>
           </template>
-          <br />
           <sub class="last-launched">
             <template v-if="lastLaunched">
-              从实例
-              <img
-                class="instance_icon"
-                :src="instance_icon_src"
-                alt="instance_icon"
-              />
-              {{ lastLaunched.name }} 继续
-              <mdui-button-icon @click="relaunch_last()">
-                <mdui-icon-play-circle></mdui-icon-play-circle>
-              </mdui-button-icon>
+              <div class="label">
+                <div>
+                  从实例
+                  <img
+                    class="instance_icon"
+                    :src="instance_icon_src"
+                    alt="instance_icon"
+                  />
+                  {{ lastLaunched.name }} 继续
+                </div>
+                <div style="flex-grow: 1" />
+                <mdui-button @click="relaunch_last()" variant="elevated">
+                  <mdui-icon-play-circle slot="icon"></mdui-icon-play-circle>
+                  运行实例
+                </mdui-button>
+              </div>
             </template>
             <template v-else>
-              最近没有运行任何实例
-              <mdui-button-icon @click="relaunch_last()">
-                <mdui-icon-play-circle></mdui-icon-play-circle>
-              </mdui-button-icon>
+              最近没有运行任何实例，请先在实例列表启动一个
             </template>
           </sub>
-        </span>
+        </mdui-card>
       </mdui-top-app-bar-title>
       <div style="flex-grow: 1"></div>
       <div class="notif-wrap">
@@ -236,7 +248,7 @@ onMounted(async () => {
   transform: translateX(150%);
 }
 mdui-top-app-bar[variant="large"] {
-  height: 18rem !important;
+  height: 20rem !important;
 }
 mdui-top-app-bar[variant="large"][shrink]:not([shrink="false" i]) {
   height: 4rem !important;
@@ -282,17 +294,31 @@ mdui-top-app-bar[shrink]:not([shrink="false" i]) .mc-avatar {
   color: rgb(var(--mdui-color-error));
 }
 .label-large-content {
-  display: block;
-  line-height: 1.5;
+  display: flexbox;
+  background-color: rgba(var(--mdui-color-secondary-container), 0.2);
+  padding: 1rem;
+  width: calc(100% + 1rem);
+  transform: translateX(0.5rem);
+  margin: 0 -1rem;
+  line-height: 1.8;
+  backdrop-filter: blur(2px) !important;
 }
-.label-large-content mdui-button-icon,
-.label-large-content img,
+.label-large-content img {
+  height: 2rem;
+  transform: translateY(0.5rem);
+  border-radius: var(--mdui-shape-corner-small);
+}
 .label-large-content sub,
 .label-large-content sub > * {
   vertical-align: middle;
 }
-.label-large-content mdui-button-icon {
+.label-large-content mdui-button {
   vertical-align: middle;
   transform: translateY(-0.15rem);
+  margin: 0 0.15rem;
+}
+.label {
+  display: flex;
+  align-items: center;
 }
 </style>

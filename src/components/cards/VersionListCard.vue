@@ -126,6 +126,7 @@ onMounted(() => {
             variant="outlined"
             :loading="loading"
             @click="loadPage()"
+            class="float-hover-card"
           >
             {{ errorMsg ? "点击重试" : "加载更多" }}
           </mdui-button>

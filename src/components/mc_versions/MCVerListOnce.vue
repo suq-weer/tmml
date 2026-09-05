@@ -4,8 +4,10 @@ import "@mdui/icons/alarm-add";
 import "@mdui/icons/commit";
 import { SingleVersion } from "../../libs/mc_version";
 import { computed } from "vue";
+import { useRouter } from "vue-router";
 
 const props = defineProps<SingleVersion>();
+const router = useRouter();
 
 function fmt_local_time(iso: String): string {
   const d = new Date(iso as string);
@@ -16,11 +18,15 @@ function fmt_local_time(iso: String): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function clickToInstall() {
+  router.push("/install");
+}
+
 const timeText = computed(() => fmt_local_time(props.releaseTime));
 </script>
 
 <template>
-  <mdui-list-item class="card">
+  <mdui-list-item class="card" @click="clickToInstall">
     <mdui-avatar
       :src="
         props.type == 'snapshot'

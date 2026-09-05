@@ -16,6 +16,7 @@ import Home from "./pages/Home.vue";
 import Download from "./pages/Download.vue";
 import ComingSoon from "./pages/ComingSoon.vue";
 import Game from "./pages/download/Game.vue";
+import Install from "./pages/Install.vue";
 
 // 初始化日志系统
 interceptConsole({ preserveOriginal: true });
@@ -64,6 +65,7 @@ const router = createRouter({
     },
     { path: "/notifications", component: Notifications },
     { path: "/profiles", component: ProfileManagement },
+    { path: "/install", component: Install },
   ],
 });
 

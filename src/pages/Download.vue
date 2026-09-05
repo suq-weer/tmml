@@ -101,6 +101,7 @@ function goBack(): void {
 
 .page-desc {
   margin: 0;
+  margin-left: 3rem !important;
   color: rgb(var(--mdui-color-on-surface-variant));
 }
 
@@ -129,7 +130,7 @@ function goBack(): void {
 
 .nav-sticky {
   position: sticky;
-  top: 1rem;
+  top: 0px;
 }
 
 .dl-list-item {
