@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
 import Stepper from "../components/Stepper.vue";
-import { SingleVersion } from "../libs/mc_version.ts";
+import RouteTransitionView from "../components/RouteTransitionView.vue";
 import { leaveCurrentSection } from "../libs/navigation.ts";
-import { ref } from "vue";
+import {
+  INSTALL_STEPS,
+  INSTALL_SUBMITTED_PATH,
+  install_step_index,
+} from "../libs/install_wizard";
+import { computed } from "vue";
+import "@mdui/icons/arrow-back.js";
 
 const route = useRoute();
-const version = history.state?.version as SingleVersion;
 
-const step = ref(0);
-const steps = ref(["环境配置", "个性化", "开始下载"]);
+const step = computed(() =>
+  route.path === INSTALL_SUBMITTED_PATH
+    ? INSTALL_STEPS.length
+    : install_step_index(route.path),
+);
+const steps = computed(() => INSTALL_STEPS.map((s) => s.label));
 
 function goBack(): void {
   leaveCurrentSection("/install");
@@ -28,11 +37,9 @@ function goBack(): void {
       <p class="page-desc">一步步带您创建一个新的 Minecraft 实例</p>
     </header>
     <div style="display: block">
-      <mdui-card class="stepper float-hover-card" variant="outlined">
-        <Stepper class="content" :steps="steps" :step="step" />
-      </mdui-card>
+      <Stepper class="content stepper" :steps="steps" :step="step" />
       <div class="guide-view">
-        <RouterView />
+        <RouteTransitionView />
       </div>
     </div>
   </div>
@@ -70,8 +77,10 @@ function goBack(): void {
 
 .stepper {
   position: sticky;
+  padding: 0.5rem;
   width: 100%;
   top: 1rem;
+  z-index: 1145;
   background-color: rgba(var(--mdui-color-surface), 0.8) !important;
   backdrop-filter: blur(2px);
 }

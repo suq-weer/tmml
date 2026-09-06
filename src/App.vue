@@ -10,6 +10,7 @@ import {
   useProfileStore,
 } from "./libs/profile";
 import { launch_backend } from "./libs/running";
+import { trackRouteTransition, useRouteTransitionName } from "./libs/route_transition";
 import MCIcon from "./assets/mc_icon.png";
 import SteveIcon from "./assets/steve.png";
 import "@mdui/icons/notifications";
@@ -25,18 +26,10 @@ const { current, lastLaunched, profiles, refresh } = useProfileStore();
 
 const unread_count = computed(() => notifications.value.length);
 const has_profiles = computed(() => profiles.value.length > 0);
-const transitionName = ref<"push" | "pop">("push");
 
-let navigationDirection: "push" | "pop" = "push";
+const transitionName = useRouteTransitionName();
 
-router.options.history.listen((_to, _from, info) => {
-  navigationDirection = info.delta < 0 ? "pop" : "push";
-});
-
-router.afterEach(() => {
-  transitionName.value = navigationDirection;
-  navigationDirection = "push";
-});
+trackRouteTransition(router);
 
 const current_profile_name = computed(
   () => current.value?.name ?? profiles.value[0]?.name ?? "",
@@ -79,7 +72,7 @@ function relaunch_last() {
     return;
   }
   launch_backend({
-    id: last.versionId,
+    id: last.dir,
     name: last.name,
     versionId: last.versionId,
     path: `versions/${last.dir}`,

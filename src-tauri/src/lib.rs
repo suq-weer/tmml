@@ -148,7 +148,8 @@ pub struct ToastPayload {
     pub version_id: Option<String>,
 }
 
-/// 下载指定版本的全部 Minecraft 文件并建立实例，全程通过 minecraft-download-progress 事件向前端推送进度
+/// 下载指定版本的全部 Minecraft 文件并建立实例，全程通过 minecraft-download-progress 事件向前端推送进度。
+/// 实例以「实例名清洗后的目录名」为唯一标识，同一版本可安装多个名称互异的实例共存。
 #[tauri::command]
 async fn download_minecraft_version(
     app: tauri::AppHandle,
@@ -274,20 +275,21 @@ async fn list_instances() -> Result<Vec<instance::MinecraftInstance>, String> {
 }
 
 /// 获取单个实例的完整信息（含配置），不存在返回 null
+/// `instance_id` 为实例标识（＝实例目录名）
 #[tauri::command]
-async fn get_instance(version_id: String) -> Result<Option<instance::InstanceInfo>, String> {
-    instance::get(&version_id).map_err(|e| e.to_string())
+async fn get_instance(instance_id: String) -> Result<Option<instance::InstanceInfo>, String> {
+    instance::get(&instance_id).map_err(|e| e.to_string())
 }
 
 /// 更新实例的名称与配置
 #[tauri::command]
 async fn update_instance(
-    version_id: String,
+    instance_id: String,
     name: Option<String>,
     config: Option<instance::InstanceConfig>,
 ) -> Result<instance::InstanceInfo, String> {
     let defaults = MainConfig::get().await.instance_defaults();
-    instance::update(&version_id, name, config, &defaults).map_err(|e| e.to_string())
+    instance::update(&instance_id, name, config, &defaults).map_err(|e| e.to_string())
 }
 
 /// 列出全部游戏档案

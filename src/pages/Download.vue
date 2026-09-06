@@ -1,6 +1,7 @@
 <script lang="ts" setup>
-import { RouterView, useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { leaveCurrentSection } from "../libs/navigation";
+import RouteTransitionView from "../components/RouteTransitionView.vue";
 import "@mdui/icons/gamepad.js";
 import "@mdui/icons/backpack.js";
 import "@mdui/icons/pie-chart-outline.js";
@@ -79,7 +80,7 @@ function goBack(): void {
       </section>
 
       <aside class="column column-right">
-        <RouterView />
+        <RouteTransitionView />
       </aside>
     </div>
   </div>
@@ -130,7 +131,7 @@ function goBack(): void {
 
 .nav-sticky {
   position: sticky;
-  top: 0px;
+  top: 5px;
 }
 
 .dl-list-item {

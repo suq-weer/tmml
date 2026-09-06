@@ -108,10 +108,10 @@ export function launch_instance(instance: RunningInstance, sessionId?: number): 
     return session;
 }
 
-/** 真实启动：调用后端创建会话，再用返回的 sessionId 注册岛 */
+/** 真实启动：调用后端创建会话，再用返回的 sessionId 注册岛。按实例 id（＝目录名）定位实例 */
 export async function launch_backend(instance: RunningInstance): Promise<number> {
     const reply = await invoke<LaunchReply>('launch_minecraft', {
-        versionId: instance.versionId,
+        instanceId: instance.id,
     });
     launch_instance(instance, reply.sessionId);
     return reply.sessionId;

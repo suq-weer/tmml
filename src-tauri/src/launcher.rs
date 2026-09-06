@@ -158,16 +158,18 @@ struct SessionBundle {
 // | tauri 命令 |
 
 /// 启动指定实例：快速校验后立即返回 sessionId，后台线程推进后续流程
+/// `instance_id` 为实例标识（＝实例目录名），同一版本的不同实例互不影响
 #[tauri::command]
-pub async fn launch_minecraft(app: AppHandle, version_id: String) -> Result<LaunchReply, String> {
-    let info = instance::get(&version_id)
+pub async fn launch_minecraft(app: AppHandle, instance_id: String) -> Result<LaunchReply, String> {
+    let info = instance::get(&instance_id)
         .map_err(|e| format!("读取实例失败: {}", e))?
-        .ok_or_else(|| format!("实例 {} 不存在，请先在实例列表完成下载", version_id))?;
+        .ok_or_else(|| format!("实例 {} 不存在，请先在实例列表完成下载", instance_id))?;
 
     let dir_name = dir_name_of(&info);
     if dir_name.is_empty() {
         return Err("实例目录名无效".to_string());
     }
+    let version_id = info.version_id.clone();
 
     let dot_minecraft =
         dirs::dot_minecraft().map_err(|e| format!("定位 .minecraft 失败: {}", e))?;

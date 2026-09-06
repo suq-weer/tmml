@@ -1,24 +1,7 @@
 <script setup lang="ts">
 import "@mdui/icons/question-mark.js";
 import { onBeforeUnmount, onMounted, ref } from "vue";
-
-const quiz = [
-  // 启动器相关
-  "目前启动器仍然将愚人节版本当快照版处理……",
-  "我相信你肯定会把玩启动器里会伸缩的标题栏（",
-  "本启动器原型最初是 Electron 技术栈，后面想学 Rust 了才转 Tauri 的",
-  "启动器的 AppImage 版本受 Tauri 影响其实并不能正常运行",
-  "这个卡片以后可以自定义位置……大概吧",
-  "Never gonna give you up.",
-  "这个启动器是 Xiaosu 第一个能启动 Minecraft 的启动器（",
-  "启动实例后的灵动岛好不好看？虽然一台电脑开不了那么多 Minecraft……",
-  "init repo 前这个项目断断续续写了半个月……XD",
-  // Minecraft 小知识
-  "Mojang 在 26.3 Pre 1 中重新加入了边境之地",
-  // MC 社区知识
-  "Neoforge 是 Forge 团队分裂出来的项目",
-  "Fabric 比 Forge 更年轻",
-];
+import { QUIZ } from "../../libs/content/dyn";
 
 const text = ref("");
 const lastText = ref("");
@@ -27,7 +10,7 @@ let timer: number | undefined;
 const randomText = () => {
   let next: string;
   do {
-    next = quiz[Math.floor(Math.random() * quiz.length)];
+    next = QUIZ[Math.floor(Math.random() * QUIZ.length)];
   } while (next === lastText.value);
 
   lastText.value = next;

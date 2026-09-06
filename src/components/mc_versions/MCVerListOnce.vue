@@ -5,9 +5,18 @@ import "@mdui/icons/commit";
 import { SingleVersion } from "../../libs/mc_version";
 import { computed } from "vue";
 import { useRouter } from "vue-router";
+import { single_version_to_query } from "../../libs/install_wizard";
 
-const props = defineProps<SingleVersion>();
+const props = withDefaults(
+  defineProps<SingleVersion & { interactive?: boolean }>(),
+  { interactive: true },
+);
 const router = useRouter();
+
+function goInstall(): void {
+  if (props.interactive === false) return;
+  router.push({ path: "/install/env", query: single_version_to_query(props) });
+}
 
 function fmt_local_time(iso: String): string {
   const d = new Date(iso as string);
@@ -18,15 +27,16 @@ function fmt_local_time(iso: String): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function clickToInstall() {
-  router.push("/install");
-}
-
 const timeText = computed(() => fmt_local_time(props.releaseTime));
 </script>
 
 <template>
-  <mdui-list-item class="card" @click="clickToInstall">
+  <mdui-list-item
+    class="card"
+    :class="{ 'card-static': props.interactive === false }"
+    :clickable="props.interactive !== false"
+    @click="goInstall"
+  >
     <mdui-avatar
       :src="
         props.type == 'snapshot'
@@ -64,6 +74,14 @@ const timeText = computed(() => fmt_local_time(props.releaseTime));
 .card:hover {
   .end-icon {
     display: block;
+  }
+}
+
+.card-static,
+.card-static:hover {
+  cursor: default;
+  .end-icon {
+    display: none;
   }
 }
 

@@ -9,7 +9,8 @@ import { setColorScheme } from "mdui";
 import { useDark } from "@vueuse/core";
 import { createMemoryHistory, createRouter } from "vue-router";
 import { interceptConsole } from "@fltsci/tauri-plugin-tracing";
-import { trackHistory } from "./libs/navigation";
+import { trackHistory, rewindSectionCursor } from "./libs/navigation";
+import { INSTALL_SUBMITTED_PATH } from "./libs/install_wizard";
 import Notifications from "./pages/Notifications.vue";
 import ProfileManagement from "./pages/ProfileManagement.vue";
 import Home from "./pages/Home.vue";
@@ -17,6 +18,10 @@ import Download from "./pages/Download.vue";
 import ComingSoon from "./pages/ComingSoon.vue";
 import Game from "./pages/download/Game.vue";
 import Install from "./pages/Install.vue";
+import InstallEnv from "./pages/install/Env.vue";
+import InstallCustomize from "./pages/install/Customize.vue";
+import InstallStart from "./pages/install/Start.vue";
+import InstallSubmitted from "./pages/install/Submitted.vue";
 
 // 初始化日志系统
 interceptConsole({ preserveOriginal: true });
@@ -65,10 +70,41 @@ const router = createRouter({
     },
     { path: "/notifications", component: Notifications },
     { path: "/profiles", component: ProfileManagement },
-    { path: "/install", component: Install },
+    {
+      path: "/install",
+      component: Install,
+      children: [
+        { path: "", redirect: { name: "install-env" } },
+        { path: "env", name: "install-env", component: InstallEnv },
+        {
+          path: "customize",
+          name: "install-customize",
+          component: InstallCustomize,
+        },
+        {
+          path: "download",
+          name: "install-download",
+          component: InstallStart,
+        },
+        {
+          path: "submitted",
+          name: "install-submitted",
+          component: InstallSubmitted,
+        },
+      ],
+    },
   ],
 });
 
 trackHistory(router);
+
+// 离开向导“任务已提交”页（按钮 / AppBar 等任意入口）时，把整段 /install 历史摘除，
+// 让 router.back() 直接回到进入向导前的页面，而不是回到向导内部。
+router.beforeEach((to, from) => {
+  if (from.path === INSTALL_SUBMITTED_PATH && !to.path.startsWith("/install")) {
+    rewindSectionCursor("/install");
+  }
+  return true;
+});
 
 createApp(App).use(router).mount("#app");

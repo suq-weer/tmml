@@ -18,10 +18,9 @@ use crate::{
     appfile::dirs,
     config::MainConfig,
     downloader::{
-        deserializer::{AssetsIndexContent, VersionContent, VersionManifest},
-        net::fetch_and_parse_json,
-        provider::VER_ALL,
-        urls::{RESOURCES_API, VERSION_MANIFEST},
+        deserializer::{AssetsIndexContent, VersionContent},
+        provider::{ensure_manifest_loaded, VER_ALL},
+        urls::RESOURCES_API,
     },
     platform::{features_default, native_classifier_candidates, rules_allow},
 };
@@ -265,20 +264,25 @@ impl MinecraftDownloader {
         Ok(content)
     }
 
-    /// 从 version_manifest.json 中查找指定版本的 <version>.json 官方 URL
+    /// 从 version_manifest.json 中查找指定版本的 <version>.json 官方 URL。
+    /// 先确保清单已就绪（可能联网刷新，但不会持锁跨 await），再短暂上锁查找。
     async fn find_version_url(&self, version_id: &str) -> Result<String> {
-        let mut provider = VER_ALL.lock().await;
-        if provider.ver.is_none() {
-            let manifest: VersionManifest = fetch_and_parse_json(VERSION_MANIFEST)
-                .await
-                .context("拉取 version_manifest 失败")?;
-            provider.ver = Some(manifest);
-        }
-        let manifest: &VersionManifest = provider.ver.as_ref().expect("version_manifest 已加载");
-        match manifest.versions.iter().find(|v| v.id == version_id) {
-            Some(version) => Ok(version.url.clone()),
-            None => bail!("版本列表中未找到 {}", version_id),
-        }
+        ensure_manifest_loaded()
+            .await
+            .context("拉取 version_manifest 失败")?;
+        let url = {
+            let provider = VER_ALL.lock().await;
+            let manifest = provider
+                .ver
+                .as_ref()
+                .expect("ensure_manifest_loaded 已确保清单就绪");
+            manifest
+                .versions
+                .iter()
+                .find(|v| v.id == version_id)
+                .map(|v| v.url.clone())
+        };
+        url.ok_or_else(|| anyhow!("版本列表中未找到 {}", version_id))
     }
 
     /// 下载 <version>.json 到 .minecraft/versions/<id>/<id>.json

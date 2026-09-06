@@ -3,9 +3,18 @@ import VersionListCard from "../../components/cards/VersionListCard.vue";
 </script>
 
 <template>
-  <VersionListCard version_mode="RELEASE" />
-  <VersionListCard version_mode="SNAPSHOT" />
-  <VersionListCard version_mode="FOOL" />
+  <div class="game-versions">
+    <VersionListCard version_mode="RELEASE" />
+    <VersionListCard version_mode="SNAPSHOT" />
+    <VersionListCard version_mode="FOOL" />
+  </div>
 </template>
 
-<style lang="css" scoped></style>
+<style scoped>
+.game-versions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+</style>

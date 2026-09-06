@@ -81,7 +81,9 @@ onMounted(async () => {
       downloading.value = false;
       status.value = e.payload.success ? "实例创建完成" : "下载失败";
       if (e.payload.success) {
-        get_instance(version_id.value)
+        const id =
+          sanitize_dir_name(instance_name.value.trim()) || version_id.value;
+        get_instance(id)
           .then((info) => {
             instance_info.value = info;
           })
@@ -100,6 +102,14 @@ function parse_args(text: string): string[] {
     .split(/[\s,]+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+/** 与后端 instance::sanitize_dir_name 保持一致的目录名清洗（仅用于本页查询刚创建的实例） */
+function sanitize_dir_name(name: string): string {
+  const s = name
+    .replace(/[/\\:*?"<>|\u0000-\u001f\u007f]/g, "")
+    .trim();
+  return s.length > 0 && s !== "." && s !== ".." ? s : "";
 }
 
 function parse_opt_uint(text: string): number | undefined {

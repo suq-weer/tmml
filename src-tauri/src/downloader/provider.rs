@@ -105,6 +105,19 @@ async fn refresh_manifest() -> anyhow::Result<deserializer::VersionManifest> {
     Ok(data)
 }
 
+/// 确保内存清单已就绪：未缓存时先释放锁再联网刷新。
+/// 避免“持锁跨 await 联网、refresh 内部再上同一把锁”导致的自锁死锁。
+pub(crate) async fn ensure_manifest_loaded() -> anyhow::Result<()> {
+    let need_refresh = {
+        let provider = VER_ALL.lock().await;
+        provider.ver.is_none()
+    };
+    if need_refresh {
+        refresh_manifest().await?;
+    }
+    Ok(())
+}
+
 pub async fn get_minecraft_version_paged(
     size_u: u32,
     page_u: u32,
@@ -118,12 +131,13 @@ pub async fn get_minecraft_version_paged(
     // 2. 获取数据：优先复用内存缓存，避免「加载更多」时反复联网拉取同一份清单。
     //    若每次分页都基于新下载的清单切片，版本可能在两次请求间插入/移除，
     //    导致前端累加时出现重复或遗漏。
+    ensure_manifest_loaded().await?;
     let manifest = {
         let provider = VER_ALL.lock().await;
-        match provider.ver.clone() {
-            Some(mani) => mani,
-            None => refresh_manifest().await?,
-        }
+        provider
+            .ver
+            .clone()
+            .ok_or_else(|| anyhow!("version_manifest 未加载"))?
     };
 
     // 3. 根据 version_mode 进行筛选
