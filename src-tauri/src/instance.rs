@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    path::PathBuf,
-};
+use std::{fs, path::PathBuf};
 
 use anyhow::{anyhow, Context, Result};
 use time::OffsetDateTime;
@@ -62,7 +59,12 @@ pub struct InstanceInfo {
 pub fn sanitize_dir_name(name: &str) -> String {
     let s: String = name
         .chars()
-        .filter(|c| !matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '\0' | '\n' | '\r' | '\t'))
+        .filter(|c| {
+            !matches!(
+                c,
+                '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '\0' | '\n' | '\r' | '\t'
+            )
+        })
         .collect();
     let s = s.trim().to_string();
     if s.is_empty() || s == "." || s == ".." {
@@ -186,8 +188,7 @@ pub fn update(
     config: Option<InstanceConfig>,
     defaults: &InstanceConfig,
 ) -> Result<InstanceInfo> {
-    let mut info =
-        get(instance_id)?.ok_or_else(|| anyhow!("实例 {} 不存在", instance_id))?;
+    let mut info = get(instance_id)?.ok_or_else(|| anyhow!("实例 {} 不存在", instance_id))?;
     if let Some(name) = name {
         if !name.trim().is_empty() {
             info.name = name.trim().to_string();
@@ -242,11 +243,21 @@ pub fn get_instance_icon(dir_name: &str) -> Result<Option<String>> {
 /// 实例配置与全局默认托底合并：数组字段实例非空则用实例，否则用全局默认；分辨率为实例 or 全局默认
 fn merge_with_defaults(config: InstanceConfig, defaults: &InstanceConfig) -> InstanceConfig {
     let pick = |instance: Vec<String>, default: &Vec<String>| {
-        if instance.is_empty() { default.clone() } else { instance }
+        if instance.is_empty() {
+            default.clone()
+        } else {
+            instance
+        }
     };
     InstanceConfig {
-        launch_command_prefix: pick(config.launch_command_prefix, &defaults.launch_command_prefix),
-        launch_command_suffix: pick(config.launch_command_suffix, &defaults.launch_command_suffix),
+        launch_command_prefix: pick(
+            config.launch_command_prefix,
+            &defaults.launch_command_prefix,
+        ),
+        launch_command_suffix: pick(
+            config.launch_command_suffix,
+            &defaults.launch_command_suffix,
+        ),
         java_path: config.java_path.or_else(|| defaults.java_path.clone()),
         jvm_args: pick(config.jvm_args, &defaults.jvm_args),
         game_args: pick(config.game_args, &defaults.game_args),

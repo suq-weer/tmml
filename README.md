@@ -30,9 +30,9 @@
 
 ##### ModLoader 适配
 
-- [ ] NeoForge 加载器安装
-- [ ] Fabric 加载器安装
-- [ ] Fabric Api 附带安装
+- [x] NeoForge 加载器安装
+- [x] Fabric 加载器安装
+- [x] Fabric Api 附带安装
 - [ ] Forge 加载器安装
 - [ ] 一键安装信雅互联版本
 

@@ -517,7 +517,7 @@ fn spawn_and_run(app: &AppHandle, b: &SessionBundle, command: LaunchCommand) {
     // slave 已由子进程持有，关闭我们这一侧，保证子进程退出后 master 读到 EOF
     drop(slave);
 
-    // 登记 kill 句柄（供停止/退出兜底），并保有一份本地副本用于读取循环
+    // 登记 kill 句柄（供「停止/退出兜底」通过注册表使用）
     let killer = child.clone_killer();
     {
         if let Ok(mut reg) = SESSIONS.lock() {
@@ -526,12 +526,6 @@ fn spawn_and_run(app: &AppHandle, b: &SessionBundle, command: LaunchCommand) {
             }
         }
     }
-    // 注意：上面 move 走了 killer；读取循环改用从注册表克隆出的新 handle
-    let killer = SESSIONS
-        .lock()
-        .ok()
-        .and_then(|reg| reg.get(&sid).map(|h| h.killer.clone()))
-        .unwrap_or_else(|| Arc::new(Mutex::new(None)));
 
     let pid = child.process_id();
     emit_state(app, sid, "running", pid, None, None);
@@ -552,46 +546,18 @@ fn spawn_and_run(app: &AppHandle, b: &SessionBundle, command: LaunchCommand) {
         }
     });
 
-    // 读取 master 输出，实时转发（保留原始字节，含 ANSI 颜色）
-    let reader = master.try_clone_reader();
-    let mut stream = match reader {
-        Ok(r) => r,
-        Err(e) => {
-            let msg = format!("读取伪终端失败: {}", e);
-            syslog(format!("[错误] {}", msg));
-            let _ = child.kill();
-            let _ = child.wait();
-            emit_state(app, sid, "exited", pid, Some(-1), Some(msg));
-            return;
-        }
-    };
+    // 读取 master 输出放在独立线程，避免“先等 EOF 再回收进程”导致的死等：
+    // Windows ConPTY 上主进程退出后 master 未必立刻给 EOF，若单线程顺序
+    // 「读到 EOF -> wait」可能永远到不了退出状态上报。这里改为后台持续
+    // 转发日志，主流程直接 wait() 进程退出。
+    let reader_app = app.clone();
+    let _ = thread::Builder::new()
+        .name(format!("mc-session-reader-{}", sid))
+        .spawn(move || run_pty_reader(reader_app, sid, master));
 
-    let mut assembler = OutAssembler::default();
-    let mut killed = false;
-    let mut chunk = [0u8; 4096];
-    loop {
-        match stream.read(&mut chunk) {
-            Ok(0) => break, // EOF：子进程退出
-            Ok(n) => {
-                assembler.push(&chunk[..n], &mut |line| emit_log(app, sid, line, "game"));
-            }
-            Err(_) => break,
-        }
-        if b.cancel.load(Ordering::Relaxed) && !killed {
-            killed = true;
-            if let Ok(mut k) = killer.lock() {
-                if let Some(k) = k.as_mut() {
-                    let _ = k.kill();
-                }
-            }
-        }
-    }
-    assembler.finish(&mut |line| emit_log(app, sid, line, "game"));
-    drop(stream);
-    drop(master);
-
-    // 回收进程，得到退出信息
+    // 回收进程（期间后台线程仍在转发游戏日志；用户停止/进程退出都会让 wait 返回）
     let wait_result = child.wait();
+    let killed = b.cancel.load(Ordering::Relaxed);
     let (code, message) = match &wait_result {
         Ok(status) => {
             if killed {
@@ -612,6 +578,32 @@ fn spawn_and_run(app: &AppHandle, b: &SessionBundle, command: LaunchCommand) {
     };
     syslog(format!("[进程] {}", message));
     emit_state(app, sid, "exited", pid, code, Some(message));
+}
+
+/// 后台读取 PTY master 并转发游戏日志，直到 EOF/出错（尽力而为）。
+/// 不参与退出状态判定——退出状态由主流程 `child.wait()` 决定。
+fn run_pty_reader(app: AppHandle, sid: u64, master: Box<dyn portable_pty::MasterPty + Send>) {
+    let mut stream = match master.try_clone_reader() {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(session_id = sid, "读取伪终端失败: {}", e);
+            return;
+        }
+    };
+    let mut assembler = OutAssembler::default();
+    let mut chunk = [0u8; 4096];
+    loop {
+        match stream.read(&mut chunk) {
+            Ok(0) => break, // EOF：子进程侧已关闭
+            Ok(n) => {
+                assembler.push(&chunk[..n], &mut |line| emit_log(&app, sid, line, "game"));
+            }
+            Err(_) => break,
+        }
+    }
+    assembler.finish(&mut |line| emit_log(&app, sid, line, "game"));
+    drop(stream);
+    drop(master);
 }
 
 /// 组装 Minecraft 控制台输出。

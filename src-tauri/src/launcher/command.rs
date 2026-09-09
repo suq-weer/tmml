@@ -72,15 +72,39 @@ pub fn build_final_command(ctx: &LaunchContext<'_>) -> Result<LaunchCommand> {
 
     let mut tokens = HashMap::new();
     tokens.insert("classpath".to_string(), join_paths(&classpath));
-    tokens.insert("classpath_separator".to_string(), path_separator().to_string());
-    tokens.insert("natives_directory".to_string(), ctx.paths.natives_dir.display().to_string());
+    tokens.insert(
+        "classpath_separator".to_string(),
+        path_separator().to_string(),
+    );
+    tokens.insert(
+        "natives_directory".to_string(),
+        ctx.paths.natives_dir.display().to_string(),
+    );
     tokens.insert("launcher_name".to_string(), ctx.launcher_name.to_string());
-    tokens.insert("launcher_version".to_string(), ctx.launcher_version.to_string());
-    tokens.insert("game_directory".to_string(), ctx.paths.game_dir.display().to_string());
-    tokens.insert("assets_root".to_string(), ctx.paths.assets_root.display().to_string());
-    tokens.insert("assets_index_name".to_string(), ctx.content.assets_index.id.clone());
-    tokens.insert("library_directory".to_string(), ctx.paths.libraries_root.display().to_string());
-    tokens.insert("client_jar".to_string(), ctx.paths.client_jar.display().to_string());
+    tokens.insert(
+        "launcher_version".to_string(),
+        ctx.launcher_version.to_string(),
+    );
+    tokens.insert(
+        "game_directory".to_string(),
+        ctx.paths.game_dir.display().to_string(),
+    );
+    tokens.insert(
+        "assets_root".to_string(),
+        ctx.paths.assets_root.display().to_string(),
+    );
+    tokens.insert(
+        "assets_index_name".to_string(),
+        ctx.content.assets_index.id.clone(),
+    );
+    tokens.insert(
+        "library_directory".to_string(),
+        ctx.paths.libraries_root.display().to_string(),
+    );
+    tokens.insert(
+        "client_jar".to_string(),
+        ctx.paths.client_jar.display().to_string(),
+    );
     tokens.insert("version_name".to_string(), ctx.content.id.clone());
     tokens.insert("version_type".to_string(), ctx.content.version_type.clone());
     tokens.insert("auth_player_name".to_string(), player_name(ctx));
@@ -104,7 +128,12 @@ pub fn build_final_command(ctx: &LaunchContext<'_>) -> Result<LaunchCommand> {
     jvm.extend(ctx.config.jvm_args.iter().cloned());
 
     // log4j 配置参数：-Dlog4j.configurationFile=<path>
-    let log_arg = ctx.content.logging.client.argument.replace("${path}", &ctx.paths.log_config_path.display().to_string());
+    let log_arg = ctx
+        .content
+        .logging
+        .client
+        .argument
+        .replace("${path}", &ctx.paths.log_config_path.display().to_string());
     if !log_arg.trim().is_empty() {
         if !ctx.paths.log_config_path.exists() {
             warnings.push(format!(
@@ -126,7 +155,11 @@ pub fn build_final_command(ctx: &LaunchContext<'_>) -> Result<LaunchCommand> {
 
     let display = shell_join(&argv);
 
-    Ok(LaunchCommand { argv, display, warnings })
+    Ok(LaunchCommand {
+        argv,
+        display,
+        warnings,
+    })
 }
 
 /// 收集类路径：所有被 rules 放行的依赖库 + 客户端 jar
@@ -262,7 +295,10 @@ mod tests {
         let mut tokens = HashMap::new();
         tokens.insert("natives_directory".to_string(), "/n".to_string());
         tokens.insert("launcher_name".to_string(), "tmml".to_string());
-        let out = expand("-Djava.library.path=${natives_directory} ${launcher_name} ${unknown_token}", &tokens);
+        let out = expand(
+            "-Djava.library.path=${natives_directory} ${launcher_name} ${unknown_token}",
+            &tokens,
+        );
         assert_eq!(out, "-Djava.library.path=/n tmml ");
     }
 
@@ -275,7 +311,11 @@ mod tests {
     #[cfg(not(windows))]
     #[test]
     fn shell_join_quotes_spaces_on_posix() {
-        let joined = shell_join(&["java".to_string(), "-Xmx 2G".to_string(), "net.minecraft".to_string()]);
+        let joined = shell_join(&[
+            "java".to_string(),
+            "-Xmx 2G".to_string(),
+            "net.minecraft".to_string(),
+        ]);
         assert!(joined.starts_with("java "));
         assert!(joined.contains("'-Xmx 2G'"));
     }

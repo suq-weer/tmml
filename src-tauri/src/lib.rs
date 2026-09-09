@@ -1,8 +1,11 @@
+#![allow(linker_messages)]
+
 pub mod appfile;
 pub mod config;
 pub mod downloader;
 pub mod instance;
 pub mod launcher;
+pub mod loader;
 pub mod platform;
 pub mod profile;
 pub mod runtime;
@@ -18,6 +21,7 @@ use std::{
 };
 
 use crate::{
+    appfile::dirs,
     config::MainConfig,
     downloader::{
         deserializer,
@@ -150,12 +154,14 @@ pub struct ToastPayload {
 
 /// 下载指定版本的全部 Minecraft 文件并建立实例，全程通过 minecraft-download-progress 事件向前端推送进度。
 /// 实例以「实例名清洗后的目录名」为唯一标识，同一版本可安装多个名称互异的实例共存。
+/// 若传入 loader，则原版下载完成后立即安装加载器并合并写回版本 JSON。
 #[tauri::command]
 async fn download_minecraft_version(
     app: tauri::AppHandle,
     version_id: String,
     instance_name: Option<String>,
     instance_config: Option<instance::InstanceConfig>,
+    loader: Option<loader::LoaderRequest>,
 ) -> Result<(), String> {
     let _ = app.emit(
         TOAST_EVENT,
@@ -187,7 +193,16 @@ async fn download_minecraft_version(
     };
     let downloader =
         MinecraftDownloader::new(app.clone(), config, cancel.clone(), dir_name.clone());
-    let result = downloader.download_version(&version_id).await;
+    let result = run_install_with_loader(
+        &downloader,
+        &version_id,
+        &dir_name,
+        instance_name.clone(),
+        instance_config,
+        &defaults,
+        loader,
+    )
+    .await;
     let cancelled = cancel.load(Ordering::Relaxed);
     DOWNLOAD_CANCELS.lock().await.remove(&version_id);
 
@@ -205,28 +220,17 @@ async fn download_minecraft_version(
         )
     } else {
         match result {
-            Ok(_) => {
-                if let Err(e) = instance::create(
-                    &version_id,
-                    instance_name,
-                    instance_config,
-                    &defaults,
-                    &dir_name,
-                ) {
-                    tracing::warn!("创建实例失败: {}", e);
-                }
-                (
-                    true,
-                    None,
-                    ToastPayload {
-                        level: "success".into(),
-                        title: format!("下载完成 {}", version_id),
-                        message: Some("下载完成".into()),
-                        kind: Some("download".into()),
-                        version_id: Some(version_id.clone()),
-                    },
-                )
-            }
+            Ok(_) => (
+                true,
+                None,
+                ToastPayload {
+                    level: "success".into(),
+                    title: format!("下载完成 {}", version_id),
+                    message: Some("下载完成".into()),
+                    kind: Some("download".into()),
+                    version_id: Some(version_id.clone()),
+                },
+            ),
             Err(e) => {
                 tracing::error!("下载 {} 失败: {}", version_id, e);
                 (
@@ -256,6 +260,69 @@ async fn download_minecraft_version(
         Some(e) => Err(e),
         None => Ok(()),
     }
+}
+
+/// 下载原版 ->（可选）安装加载器 -> 创建实例 的完整链路
+async fn run_install_with_loader(
+    downloader: &MinecraftDownloader,
+    version_id: &str,
+    dir_name: &str,
+    instance_name: Option<String>,
+    instance_config: Option<instance::InstanceConfig>,
+    defaults: &instance::InstanceConfig,
+    loader: Option<loader::LoaderRequest>,
+) -> anyhow::Result<()> {
+    // 1. 下载原版
+    let content = downloader.download_version(version_id).await?;
+
+    // 2. 安装加载器（若选择）
+    if let Some(req) = loader {
+        let dot_minecraft = dirs::dot_minecraft()?;
+        let game_dir = dot_minecraft.join("versions").join(dir_name);
+        let java_bin = {
+            let cfg_java = instance_config.as_ref().and_then(|c| c.java_path.clone());
+            cfg_java
+                .or_else(|| defaults.java_path.clone())
+                .unwrap_or_else(|| "java".to_string())
+        };
+        let ctx = loader::InstallContext {
+            game_dir: game_dir.clone(),
+            libraries_dir: dot_minecraft.join("libraries"),
+            dot_minecraft,
+            client_jar: game_dir.join(format!("{}.jar", version_id)),
+            java_bin,
+            base: content.clone(),
+        };
+        loader::install_loader(
+            req.kind,
+            version_id,
+            &req.version,
+            req.with_fabric_api,
+            &ctx,
+        )
+        .await?;
+    }
+
+    // 3. 创建实例（注册到实例列表）
+    instance::create(
+        version_id,
+        instance_name,
+        instance_config,
+        defaults,
+        dir_name,
+    )?;
+    Ok(())
+}
+
+/// 列出指定 Minecraft 版本可用的加载器版本
+#[tauri::command]
+async fn list_loader_versions(
+    kind: loader::LoaderKind,
+    minecraft_version: String,
+) -> Result<Vec<loader::LoaderVersion>, String> {
+    loader::list_loader_versions(kind, &minecraft_version)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// 取消指定版本的下载
@@ -493,6 +560,7 @@ pub fn run() {
             get_version,
             download_minecraft_version,
             cancel_minecraft_download,
+            list_loader_versions,
             list_instances,
             get_instance,
             update_instance,

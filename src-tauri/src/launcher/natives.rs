@@ -120,8 +120,8 @@ pub fn extract_natives(tasks: &[NativeTask], natives_dir: &Path) -> Result<(usiz
                 continue;
             }
             let dest = natives_dir.join(&base);
-            let mut out = File::create(&dest)
-                .with_context(|| format!("创建文件失败：{}", dest.display()))?;
+            let mut out =
+                File::create(&dest).with_context(|| format!("创建文件失败：{}", dest.display()))?;
             std::io::copy(&mut entry, &mut out)
                 .with_context(|| format!("解压文件失败：{}", dest.display()))?;
             total += 1;

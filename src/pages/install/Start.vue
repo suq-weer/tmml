@@ -11,7 +11,9 @@ import {
   instance_display_name,
   type InstanceCustomizeValues,
 } from "../../libs/instance_customize";
-import { SUPPORTED_LOADERS } from "../../libs/loader";
+import { SUPPORTED_LOADERS, type LoaderId } from "../../libs/loader";
+import { get_loader_choice } from "../../libs/loader_choice";
+import { neo_forge_supported } from "../../libs/mc_version";
 import { useToastStore } from "../../libs/toast";
 
 const route = useRoute();
@@ -21,11 +23,29 @@ const LOADER_KEY = "loader";
 
 const version = computed(() => single_version_from_query(route.query));
 const version_id = computed(() => String(version.value?.id ?? ""));
+const version_type = computed(() => String(version.value?.type ?? ""));
 
-const loader = computed(() => {
+const queryLoader = computed(() => {
   const value = route.query[LOADER_KEY];
   const raw = typeof value === "string" ? value : Array.isArray(value) ? value[0] : "";
-  return SUPPORTED_LOADERS.find((l) => l.id === raw) ?? null;
+  const meta = SUPPORTED_LOADERS.find((l) => l.id === raw) ?? null;
+  if (!meta || !version_id.value) return null;
+  if (
+    meta.id === "neoforge" &&
+    !neo_forge_supported({ id: version_id.value, type: version_type.value })
+  ) {
+    // 与 Env 步一致：NeoForge 不受当前版本支持时视为未选
+    return null;
+  }
+  return meta;
+});
+
+/** 向导在 Env 步里提交的加载器选择（版本、附装项） */
+const choice = computed(() => get_loader_choice(version_id.value));
+
+const loader = computed(() => {
+  const kind = choice.value?.kind ?? (queryLoader.value?.id as LoaderId | undefined);
+  return SUPPORTED_LOADERS.find((l) => l.id === kind) ?? null;
 });
 
 const customize = ref<InstanceCustomizeValues>(
@@ -40,13 +60,29 @@ function arg_count(values: InstanceCustomizeValues, key: "jvmArgs" | "gameArgs" 
   return values[key].length;
 }
 
+/** 加载器信息完整（选了加载器但版本缺失时禁止提交） */
+const allowStart = computed(
+  () =>
+    !!version.value &&
+    (!queryLoader.value || (!!choice.value && !!choice.value.version)),
+);
+
 /** 直接发起下载任务并放行提交页，不等待下载过程（进度由后端 toast 事件驱动） */
 function startTask(): boolean {
   if (!version.value) return false;
+  if (queryLoader.value && (!choice.value || !choice.value.version)) {
+    pushToast({
+      level: "warning",
+      title: "加载器信息不完整",
+      message: "请回到「环境配置」步骤重新选择加载器版本",
+    });
+    return false;
+  }
   create_instance(
     version_id.value,
     instance_display_name(customize.value, version_id.value),
     build_instance_config(customize.value),
+    choice.value ?? null,
   ).catch((e) => {
     pushToast({
       level: "error",
@@ -94,6 +130,14 @@ function startTask(): boolean {
             <b v-if="loader">{{ loader.name }}</b>
             <b v-else class="dim">不安装（纯净版）</b>
           </div>
+          <div v-if="loader" class="row">
+            <span>加载器版本</span>
+            <b>{{ choice?.version }}</b>
+          </div>
+          <div v-if="loader && choice?.withFabricApi" class="row">
+            <span>Fabric API</span>
+            <b>同时安装</b>
+          </div>
           <div class="row">
             <span>JVM 参数</span>
             <b v-if="arg_count(customize, 'jvmArgs') > 0">
@@ -133,7 +177,7 @@ function startTask(): boolean {
     </template>
 
     <StepActions
-      :allow-next="!!version"
+      :allow-next="allowStart"
       :before-next="startTask"
     />
   </div>

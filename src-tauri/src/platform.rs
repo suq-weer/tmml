@@ -39,10 +39,7 @@ pub fn native_classifier_candidates() -> Vec<String> {
 }
 
 /// 针对给定平台与架构后缀计算候选键（便于测试与跨平台定制）
-pub fn native_classifier_candidates_for(
-    platform_os: &str,
-    arch: Option<&str>,
-) -> Vec<String> {
+pub fn native_classifier_candidates_for(platform_os: &str, arch: Option<&str>) -> Vec<String> {
     let bases: &[&str] = match platform_os {
         "osx" => &["natives-macos", "natives-osx"],
         "windows" => &["natives-windows"],
@@ -142,11 +139,7 @@ fn rule_applies(rule: &Rule, features: &FeatureState) -> bool {
 /// `default_allowed` 决定「存在 rules 但没有任何一条命中」时的初值：
 /// - 库过滤/类路径：`true`（仅当命中 disallow 才排除，兼容官方多数库仅用单条 allow/disallow 的写法）
 /// - arguments 门控：`false`（仅当命中 allow 才纳入，避免 -XstartOnFirstThread 这类参数漏到其它平台）
-pub fn rules_allow(
-    rules: Option<&[Rule]>,
-    features: &FeatureState,
-    default_allowed: bool,
-) -> bool {
+pub fn rules_allow(rules: Option<&[Rule]>, features: &FeatureState, default_allowed: bool) -> bool {
     let Some(rules) = rules else {
         return true;
     };
@@ -225,5 +218,3 @@ mod tests {
         assert!(rules_allow(Some(&rules), &yes, false));
     }
 }
-
-

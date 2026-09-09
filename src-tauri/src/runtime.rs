@@ -27,8 +27,12 @@ struct RuntimeStateCell {
     loaded: bool,
 }
 
-static STATE: LazyLock<Mutex<RuntimeStateCell>> =
-    LazyLock::new(|| Mutex::new(RuntimeStateCell { state: RuntimeState::default(), loaded: false }));
+static STATE: LazyLock<Mutex<RuntimeStateCell>> = LazyLock::new(|| {
+    Mutex::new(RuntimeStateCell {
+        state: RuntimeState::default(),
+        loaded: false,
+    })
+});
 
 fn runtime_file() -> Result<PathBuf> {
     Ok(dirs::config()?.join("tmml_runtime.json"))

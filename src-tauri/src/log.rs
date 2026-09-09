@@ -1,6 +1,6 @@
 use std::{fmt, panic};
 use time::macros::format_description;
-use tracing::{Event, Level, Subscriber, info};
+use tracing::{info, Event, Level, Subscriber};
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
 use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::EnvFilter;
@@ -29,7 +29,10 @@ where
         let time_format = format_description!(
             "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:3]"
         );
-        let time_str = now.expect("获取系统时间失败").format(&time_format).unwrap_or_default();
+        let time_str = now
+            .expect("获取系统时间失败")
+            .format(&time_format)
+            .unwrap_or_default();
         let level = event.metadata().level();
         // 根据级别选择颜色
         let color = match *level {
@@ -79,7 +82,8 @@ pub fn init_logger() {
 fn setup_panic_hook() {
     panic::set_hook(Box::new(move |info| {
         // 提取 panic 发生的位置（文件名:行号）
-        let location = info.location()
+        let location = info
+            .location()
             .map(|l| format!("{}:{}", l.file(), l.line()))
             .unwrap_or_else(|| "unknown".into());
 
@@ -96,8 +100,6 @@ fn setup_panic_hook() {
         };
 
         // 通过 tracing 输出 error 级别日志
-        tracing::error!(
-            "{} | 程序抛出 Panic 导致崩溃！{}", location, message
-        );
+        tracing::error!("{} | 程序抛出 Panic 导致崩溃！{}", location, message);
     }));
 }

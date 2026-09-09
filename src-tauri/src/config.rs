@@ -57,8 +57,12 @@ struct ConfigState {
     loaded: bool,
 }
 
-static STATE: LazyLock<Mutex<ConfigState>> =
-    LazyLock::new(|| Mutex::new(ConfigState { config: MainConfig::default(), loaded: false }));
+static STATE: LazyLock<Mutex<ConfigState>> = LazyLock::new(|| {
+    Mutex::new(ConfigState {
+        config: MainConfig::default(),
+        loaded: false,
+    })
+});
 
 fn config_file() -> Result<std::path::PathBuf> {
     Ok(dirs::config()?.join("config.json"))

@@ -18,6 +18,51 @@ export interface SingleVersion {
 
 export type VersionMode = "ALL" | "RELEASE" | "SNAPSHOT" | "FOOL";
 
+// ========== 版本比较（用于加载器支持范围判定） ==========
+
+/**
+ * 解析正式版号如 1.20.1 / 1.21 / 26.2 为 (major, minor, patch)。
+ * 含字母的快照（24w14a、1.21.5-pre1）等返回 null。
+ */
+export function mc_release_parts(
+  id: string,
+): [major: number, minor: number, patch: number] | null {
+  const s = String(id);
+  if (s.length === 0 || /[^0-9.]/.test(s)) return null;
+  const nums = s
+    .split(".")
+    .filter((seg) => seg.length > 0)
+    .map(Number);
+  if (nums.length === 0 || nums.some((n) => !Number.isInteger(n))) return null;
+  return [nums[0]!, nums[1] ?? 0, nums[2] ?? 0];
+}
+
+/** 正式版语义比较：a >= b */
+export function mc_release_at_least(
+  id: string,
+  target: [number, number, number],
+): boolean {
+  const a = mc_release_parts(id);
+  if (!a) return false;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] > target[i]) return true;
+    if (a[i] < target[i]) return false;
+  }
+  return true;
+}
+
+/**
+ * NeoForge 是否支持该 Minecraft 版本：需要 1.20.1 及以上的正式版。
+ * 快照 / 愚人节版本等一律视为不支持。
+ */
+export function neo_forge_supported(v: {
+  id: string;
+  type?: string;
+}): boolean {
+  if (v.type && v.type !== "release") return false;
+  return mc_release_at_least(String(v.id), [1, 20, 1]);
+}
+
 export interface VersionPage {
     latest: LatestVersion,
     versions: SingleVersion[],

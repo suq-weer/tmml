@@ -45,8 +45,7 @@ pub struct GameProfile {
 }
 
 /// 当前激活的游戏档案（启动时自动切换到默认档案）
-static CURRENT_PROFILE: LazyLock<Mutex<Option<GameProfile>>> =
-    LazyLock::new(|| Mutex::new(None));
+static CURRENT_PROFILE: LazyLock<Mutex<Option<GameProfile>>> = LazyLock::new(|| Mutex::new(None));
 
 fn profiles_file() -> Result<PathBuf> {
     Ok(dirs::dot_minecraft()?.join("tmml_profiles.json"))
@@ -178,14 +177,23 @@ mod tests {
     fn parse_auth_type_known() {
         assert_eq!(parse_auth_type("offline").unwrap(), AuthType::Offline);
         assert_eq!(parse_auth_type("Microsoft").unwrap(), AuthType::Microsoft);
-        assert_eq!(parse_auth_type("authlib-injector").unwrap(), AuthType::AuthlibInjector);
-        assert_eq!(parse_auth_type("AUTHLIB_INJECTOR").unwrap(), AuthType::AuthlibInjector);
+        assert_eq!(
+            parse_auth_type("authlib-injector").unwrap(),
+            AuthType::AuthlibInjector
+        );
+        assert_eq!(
+            parse_auth_type("AUTHLIB_INJECTOR").unwrap(),
+            AuthType::AuthlibInjector
+        );
         assert!(parse_auth_type("foo").is_err());
     }
 
     #[test]
     fn auth_type_serde_roundtrip() {
-        assert_eq!(serde_json::to_string(&AuthType::Offline).unwrap(), "\"offline\"");
+        assert_eq!(
+            serde_json::to_string(&AuthType::Offline).unwrap(),
+            "\"offline\""
+        );
         assert_eq!(
             serde_json::from_str::<AuthType>("\"microsoft\"").unwrap(),
             AuthType::Microsoft

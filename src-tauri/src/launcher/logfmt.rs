@@ -86,7 +86,10 @@ pub fn parse_event_block(xml: &str) -> Option<GameLogEvent> {
                 .map(str::to_string)
                 .collect();
             return Some(GameLogEvent {
-                timestamp_ms: attrs.get("timestamp").and_then(|s| s.parse().ok()).unwrap_or(0),
+                timestamp_ms: attrs
+                    .get("timestamp")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0),
                 level: attrs.get("level").cloned().unwrap_or_default(),
                 thread: attrs.get("thread").cloned().unwrap_or_default(),
                 logger: attrs.get("logger").cloned().unwrap_or_default(),
@@ -98,7 +101,10 @@ pub fn parse_event_block(xml: &str) -> Option<GameLogEvent> {
 
     // 没有 Message 元素：退化为整体文本（异常情况尽量不丢信息）
     Some(GameLogEvent {
-        timestamp_ms: attrs.get("timestamp").and_then(|s| s.parse().ok()).unwrap_or(0),
+        timestamp_ms: attrs
+            .get("timestamp")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0),
         level: attrs.get("level").cloned().unwrap_or_default(),
         thread: attrs.get("thread").cloned().unwrap_or_default(),
         logger: attrs.get("logger").cloned().unwrap_or_default(),
@@ -111,7 +117,11 @@ pub fn parse_event_block(xml: &str) -> Option<GameLogEvent> {
 pub fn event_to_lines(ev: &GameLogEvent) -> Vec<String> {
     let time = format_timestamp_ms(ev.timestamp_ms);
     let level = ev.level.to_uppercase();
-    let thread = if ev.thread.is_empty() { "?" } else { ev.thread.trim() };
+    let thread = if ev.thread.is_empty() {
+        "?"
+    } else {
+        ev.thread.trim()
+    };
 
     let mut lines = Vec::new();
     let header = format!("[{}] [{}/{}]", time, thread, level);
@@ -299,7 +309,9 @@ pub fn format_timestamp_ms(ms: i64) -> String {
     let offset = time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC);
     let local = odt.to_offset(offset);
     local
-        .format(&time::macros::format_description!("[hour]:[minute]:[second]"))
+        .format(&time::macros::format_description!(
+            "[hour]:[minute]:[second]"
+        ))
         .unwrap_or_default()
 }
 
