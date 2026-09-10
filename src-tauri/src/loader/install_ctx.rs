@@ -2,7 +2,12 @@
 
 use std::path::PathBuf;
 
-use crate::downloader::deserializer::VersionContent;
+use tauri::AppHandle;
+
+use crate::downloader::{
+    deserializer::VersionContent,
+    minecraft::{DownloadPhase, PhaseProgress},
+};
 
 pub struct InstallContext {
     /// 实例目录 versions/<dir>
@@ -17,6 +22,10 @@ pub struct InstallContext {
     pub java_bin: String,
     /// 原版版本 JSON（作为合并基底）
     pub base: VersionContent,
+    /// Tauri 应用句柄，用于向前端推送安装进度
+    pub app: AppHandle,
+    /// 进度事件使用的版本号（与下载 Toast 的 versionId 一致）
+    pub version_id: String,
 }
 
 impl InstallContext {
@@ -27,5 +36,21 @@ impl InstallContext {
 
     pub fn minecraft_version(&self) -> &str {
         &self.base.id
+    }
+
+    /// 构造一个加载器安装阶段的进度上报器，复用原版下载的进度事件格式
+    pub(crate) fn progress(
+        &self,
+        phase: DownloadPhase,
+        count: u64,
+        bytes_total: u64,
+    ) -> PhaseProgress {
+        PhaseProgress::new(
+            self.app.clone(),
+            self.version_id.clone(),
+            phase,
+            count,
+            bytes_total,
+        )
     }
 }

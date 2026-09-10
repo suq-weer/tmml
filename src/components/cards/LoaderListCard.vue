@@ -2,6 +2,8 @@
 import "@mdui/icons/check.js";
 import "@mdui/icons/extension.js";
 import "@mdui/icons/block.js";
+import NeoForgeIcon from "../../assets/neoforged.png";
+import FabricIcon from "../../assets/fabric.png";
 import type { LoaderMeta } from "../../libs/loader";
 
 const props = withDefaults(
@@ -22,6 +24,15 @@ function toggle(): void {
   if (props.disabled) return;
   emit("select", props.loader.id);
 }
+
+function queryModderIcon(): string {
+  switch (props.loader.id) {
+    case "neoforge":
+      return NeoForgeIcon;
+    case "fabric":
+      return FabricIcon;
+  }
+}
 </script>
 
 <template>
@@ -30,12 +41,8 @@ function toggle(): void {
     class="loader-card float-hover-card"
     :class="{ selected: props.selected, disabled: props.disabled }"
   >
-    <div
-      class="head"
-      :class="{ disabled: props.disabled }"
-      @click="toggle"
-    >
-      <mdui-icon-extension class="head-icon"></mdui-icon-extension>
+    <div class="head" :class="{ disabled: props.disabled }" @click="toggle">
+      <img class="head-icon" :src="queryModderIcon()" />
       <div class="head-text">
         <p class="head-name">{{ props.loader.name }}</p>
         <sub class="head-desc">{{ props.loader.desc }}</sub>
@@ -48,7 +55,10 @@ function toggle(): void {
           v-if="props.selected"
           class="mark-check"
         ></mdui-icon-check>
-        <mdui-icon-block v-else-if="props.disabled" class="mark-check"></mdui-icon-block>
+        <mdui-icon-block
+          v-else-if="props.disabled"
+          class="mark-check"
+        ></mdui-icon-block>
       </span>
     </div>
 
@@ -104,8 +114,8 @@ function toggle(): void {
 }
 
 .head-icon {
-  font-size: 1.75rem;
-  color: rgb(var(--mdui-color-primary));
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .head-text {

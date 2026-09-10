@@ -69,6 +69,8 @@
 
 - Minecraft 草方块与泥土、Steve 皮肤头像：[Minecraft 中文 Wiki](https://zh.minecraft.wiki/)
 - Tauri 默认 Logo
+- Neoforge Logo：[Neoforged](https://github.com/neoforged)
+- Fabric Logo：[Fabric](https://github.com/FabricMC)
 
 ### 嵌入字体
 

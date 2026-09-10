@@ -13,6 +13,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use std::{io::Read, path::PathBuf};
 
 use crate::downloader::deserializer::{Arguments, Artifact, OnceLibraries};
+use crate::downloader::minecraft::{DownloadPhase, PhaseProgress};
 use crate::loader::{
     download::{sha1_hex_file, RepoArtifact},
     maven::relative_path_of,
@@ -71,7 +72,11 @@ async fn parse_install_profile(installer: &std::path::Path) -> Result<InstallPro
 }
 
 /// 预下载安装期依赖（有 downloads 声明的制品）
-async fn predownload_libraries(ctx: &InstallContext, libraries: &[ProfileLibrary]) -> Result<()> {
+async fn predownload_libraries(
+    ctx: &InstallContext,
+    libraries: &[ProfileLibrary],
+    progress: &PhaseProgress,
+) -> Result<()> {
     for lib in libraries {
         let Some(artifact) = lib.artifact() else {
             continue;
@@ -88,7 +93,8 @@ async fn predownload_libraries(ctx: &InstallContext, libraries: &[ProfileLibrary
         if artifact.exact_url.is_none() {
             artifact.bases = NEOFORGE_REPOS.iter().map(|s| s.to_string()).collect();
         }
-        crate::loader::download::ensure_artifact(&artifact, &ctx.libraries_dir).await?;
+        crate::loader::download::ensure_artifact(&artifact, &ctx.libraries_dir, Some(progress))
+            .await?;
     }
     Ok(())
 }
@@ -102,6 +108,7 @@ fn describe_lib(lib: &OnceLibraries) -> String {
 async fn ensure_runtime_library(
     ctx: &InstallContext,
     lib: &OnceLibraries,
+    progress: &PhaseProgress,
 ) -> Result<OnceLibraries> {
     let artifact = match &lib.downloads.artifact {
         a if a.path.is_empty() => {
@@ -141,7 +148,7 @@ async fn ensure_runtime_library(
         repo.bases = NEOFORGE_REPOS.iter().map(|s| s.to_string()).collect();
     }
 
-    let path = crate::loader::download::ensure_artifact(&repo, &ctx.libraries_dir)
+    let path = crate::loader::download::ensure_artifact(&repo, &ctx.libraries_dir, Some(progress))
         .await
         .map_err(|e| anyhow!("下载 NeoForge 运行时库 {} 失败: {}", describe_lib(lib), e))?;
     let sha1 = sha1_hex_file(&path)?;
@@ -201,7 +208,10 @@ pub async fn install(
 
     // 1. 下载 installer
     let url = installer_url(minecraft_version, loader_version);
-    crate::loader::download::download_file(&url, &installer_path, None).await?;
+    let installer_progress = ctx.progress(DownloadPhase::LoaderInstaller, 1, 0);
+    crate::loader::download::download_file(&url, &installer_path, None, Some(&installer_progress))
+        .await?;
+    installer_progress.emit(String::new(), 0, 0, 0, true, false);
 
     // 2. 解析 install_profile.json
     let profile = parse_install_profile(&installer_path).await?;
@@ -220,7 +230,23 @@ pub async fn install(
         "预下载 NeoForge 安装期依赖（{} 项）",
         profile.libraries.len()
     );
-    predownload_libraries(ctx, &profile.libraries).await?;
+    let install_lib_count = profile
+        .libraries
+        .iter()
+        .filter(|l| l.artifact().is_some())
+        .count() as u64;
+    let install_lib_bytes: u64 = profile
+        .libraries
+        .iter()
+        .filter_map(|l| l.artifact().and_then(|a| a.size))
+        .sum();
+    let predownload_progress = ctx.progress(
+        DownloadPhase::LoaderLibraries,
+        install_lib_count,
+        install_lib_bytes,
+    );
+    predownload_libraries(ctx, &profile.libraries, &predownload_progress).await?;
+    predownload_progress.emit(String::new(), 0, 0, 0, true, false);
 
     // 4. 客户端副本 + 执行 processor
     let client_copy = temp.join("minecraft-client.jar");
@@ -239,11 +265,29 @@ pub async fn install(
         .main_class
         .ok_or_else(|| anyhow!("installer version.json 缺少 mainClass"))?;
 
+    let runtime_bytes: u64 = loader_json
+        .libraries
+        .iter()
+        .filter_map(|l| {
+            let a = &l.downloads.artifact;
+            if a.size > 0 {
+                Some(a.size)
+            } else {
+                None
+            }
+        })
+        .sum();
+    let runtime_progress = ctx.progress(
+        DownloadPhase::LoaderLibraries,
+        loader_json.libraries.len() as u64,
+        runtime_bytes,
+    );
     let mut libraries = Vec::new();
     for lib in loader_json.libraries {
-        let normalized = ensure_runtime_library(ctx, &lib).await?;
+        let normalized = ensure_runtime_library(ctx, &lib, &runtime_progress).await?;
         libraries.push(normalized);
     }
+    runtime_progress.emit(String::new(), 0, 0, 0, true, false);
 
     let java_major = loader_json
         .java_version

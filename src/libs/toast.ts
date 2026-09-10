@@ -9,7 +9,11 @@ export type DownloadPhase =
     | 'libraries'
     | 'assetsIndex'
     | 'logging'
-    | 'assets';
+    | 'assets'
+    | 'loaderInstaller'
+    | 'loaderLibraries'
+    | 'loaderProcessors'
+    | 'loaderFabricApi';
 
 export const ALL_PHASES: DownloadPhase[] = [
     'versionJson',
@@ -18,7 +22,25 @@ export const ALL_PHASES: DownloadPhase[] = [
     'assetsIndex',
     'logging',
     'assets',
+    'loaderInstaller',
+    'loaderLibraries',
+    'loaderProcessors',
+    'loaderFabricApi',
 ];
+
+/** 阶段展示名称（加载器阶段与原版下载阶段共用同一套进度 UI） */
+export const PHASE_LABELS: Record<DownloadPhase, string> = {
+    versionJson: '下载版本信息',
+    clientJar: '下载客户端',
+    libraries: '下载依赖库',
+    assetsIndex: '下载资源索引',
+    logging: '下载日志配置',
+    assets: '下载资源文件',
+    loaderInstaller: '下载加载器安装器',
+    loaderLibraries: '下载加载器库',
+    loaderProcessors: '执行安装处理器',
+    loaderFabricApi: '安装 Fabric API',
+};
 
 export interface ToastPayload {
     level: ToastLevel;

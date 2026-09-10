@@ -6,6 +6,7 @@
 use anyhow::{bail, Context, Result};
 
 use crate::downloader::deserializer::{Artifact, LibrariesDownloads, OnceLibraries};
+use crate::downloader::minecraft::{DownloadPhase, PhaseProgress};
 use crate::loader::{
     download::{sha1_hex_file, RepoArtifact},
     maven::split_coordinate,
@@ -52,6 +53,7 @@ async fn append_libraries(
     libs: &[FabricLibrary],
     libraries: &mut Vec<OnceLibraries>,
     seen: &mut std::collections::HashSet<String>,
+    progress: &PhaseProgress,
 ) -> Result<()> {
     for lib in libs {
         if !seen.insert(lib.name.clone()) {
@@ -61,7 +63,9 @@ async fn append_libraries(
             continue;
         }
         let artifact = repo_artifact(lib)?;
-        let path = crate::loader::download::ensure_artifact(&artifact, &ctx.libraries_dir).await?;
+        let path =
+            crate::loader::download::ensure_artifact(&artifact, &ctx.libraries_dir, Some(progress))
+                .await?;
         let sha1 = match &lib.sha1 {
             Some(s) => s.clone(),
             None => sha1_hex_file(&path)?,
@@ -94,6 +98,7 @@ async fn append_maven_library(
     repo_base: &str,
     libraries: &mut Vec<OnceLibraries>,
     seen: &mut std::collections::HashSet<String>,
+    progress: &PhaseProgress,
 ) -> Result<()> {
     if !seen.insert(maven_name.to_string()) {
         return Ok(());
@@ -111,7 +116,9 @@ async fn append_maven_library(
         sha1: None,
         size: None,
     };
-    let path = crate::loader::download::ensure_artifact(&artifact, &ctx.libraries_dir).await?;
+    let path =
+        crate::loader::download::ensure_artifact(&artifact, &ctx.libraries_dir, Some(progress))
+            .await?;
     let sha1 = sha1_hex_file(&path)?;
     let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
     libraries.push(OnceLibraries {
@@ -140,7 +147,9 @@ pub async fn build_patch(
         bail!("Fabric 只能安装到纯净原版上（当前入口不是 net.minecraft.client.main.Main）");
     }
 
+    let meta_progress = ctx.progress(DownloadPhase::LoaderInstaller, 1, 0);
     let meta = fetch_launch_meta(minecraft_version, loader_version).await?;
+    meta_progress.emit(String::new(), 0, 0, 0, true, false);
     let main_class = meta
         .launcher_meta
         .main_class
@@ -151,12 +160,27 @@ pub async fn build_patch(
     let mut libraries: Vec<OnceLibraries> = Vec::new();
     let mut seen = std::collections::HashSet::new();
 
+    // 预估库数量与字节总量，用于前端进度展示（去重后的实际数量可能更少）
+    let lib_count = (meta.launcher_meta.libraries.common.len()
+        + meta.launcher_meta.libraries.server.len()
+        + 2) as u64;
+    let lib_bytes: u64 = meta
+        .launcher_meta
+        .libraries
+        .common
+        .iter()
+        .chain(meta.launcher_meta.libraries.server.iter())
+        .filter_map(|l| l.size)
+        .sum();
+    let lib_progress = ctx.progress(DownloadPhase::LoaderLibraries, lib_count, lib_bytes);
+
     // common + server（与文档/HMCL 行为一致）
     append_libraries(
         ctx,
         &meta.launcher_meta.libraries.common,
         &mut libraries,
         &mut seen,
+        &lib_progress,
     )
     .await?;
     append_libraries(
@@ -164,6 +188,7 @@ pub async fn build_patch(
         &meta.launcher_meta.libraries.server,
         &mut libraries,
         &mut seen,
+        &lib_progress,
     )
     .await?;
 
@@ -174,6 +199,7 @@ pub async fn build_patch(
         FABRIC_MAVEN,
         &mut libraries,
         &mut seen,
+        &lib_progress,
     )
     .await?;
     append_maven_library(
@@ -182,8 +208,10 @@ pub async fn build_patch(
         FABRIC_MAVEN,
         &mut libraries,
         &mut seen,
+        &lib_progress,
     )
     .await?;
+    lib_progress.emit(String::new(), 0, 0, 0, true, false);
 
     // 旧版 LaunchWrapper 兼容参数
     let mut game_args = Vec::new();

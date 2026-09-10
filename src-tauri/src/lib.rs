@@ -163,11 +163,21 @@ async fn download_minecraft_version(
     instance_config: Option<instance::InstanceConfig>,
     loader: Option<loader::LoaderRequest>,
 ) -> Result<(), String> {
+    let has_loader = loader.is_some();
+    let start_title = match &loader {
+        Some(req) => format!(
+            "开始下载并安装 {} {} ({})",
+            req.kind.as_str(),
+            version_id,
+            req.version
+        ),
+        None => format!("开始下载 {}", version_id),
+    };
     let _ = app.emit(
         TOAST_EVENT,
         &ToastPayload {
             level: "info".into(),
-            title: format!("开始下载 {}", version_id),
+            title: start_title,
             message: None,
             kind: Some("download".into()),
             version_id: Some(version_id.clone()),
@@ -195,6 +205,7 @@ async fn download_minecraft_version(
         MinecraftDownloader::new(app.clone(), config, cancel.clone(), dir_name.clone());
     let result = run_install_with_loader(
         &downloader,
+        &app,
         &version_id,
         &dir_name,
         instance_name.clone(),
@@ -212,7 +223,11 @@ async fn download_minecraft_version(
             Some("下载已取消".into()),
             ToastPayload {
                 level: "warning".into(),
-                title: format!("下载已取消 {}", version_id),
+                title: if has_loader {
+                    format!("下载并安装已取消 {}", version_id)
+                } else {
+                    format!("下载已取消 {}", version_id)
+                },
                 message: Some("下载已取消".into()),
                 kind: Some("download".into()),
                 version_id: Some(version_id.clone()),
@@ -225,8 +240,16 @@ async fn download_minecraft_version(
                 None,
                 ToastPayload {
                     level: "success".into(),
-                    title: format!("下载完成 {}", version_id),
-                    message: Some("下载完成".into()),
+                    title: if has_loader {
+                        format!("下载并安装完成 {}", version_id)
+                    } else {
+                        format!("下载完成 {}", version_id)
+                    },
+                    message: Some(if has_loader {
+                        "下载并安装完成".into()
+                    } else {
+                        "下载完成".into()
+                    }),
                     kind: Some("download".into()),
                     version_id: Some(version_id.clone()),
                 },
@@ -238,7 +261,11 @@ async fn download_minecraft_version(
                     Some(e.to_string()),
                     ToastPayload {
                         level: "error".into(),
-                        title: format!("下载失败 {}", version_id),
+                        title: if has_loader {
+                            format!("下载或安装失败 {}", version_id)
+                        } else {
+                            format!("下载失败 {}", version_id)
+                        },
                         message: Some(e.to_string()),
                         kind: Some("download".into()),
                         version_id: Some(version_id.clone()),
@@ -265,6 +292,7 @@ async fn download_minecraft_version(
 /// 下载原版 ->（可选）安装加载器 -> 创建实例 的完整链路
 async fn run_install_with_loader(
     downloader: &MinecraftDownloader,
+    app: &tauri::AppHandle,
     version_id: &str,
     dir_name: &str,
     instance_name: Option<String>,
@@ -292,6 +320,8 @@ async fn run_install_with_loader(
             client_jar: game_dir.join(format!("{}.jar", version_id)),
             java_bin,
             base: content.clone(),
+            app: app.clone(),
+            version_id: version_id.to_string(),
         };
         loader::install_loader(
             req.kind,
@@ -365,12 +395,6 @@ async fn list_game_profiles() -> Result<Vec<profile::GameProfile>, String> {
     profile::list().map_err(|e| e.to_string())
 }
 
-/// 获取单个游戏档案，不存在返回 null
-#[tauri::command]
-async fn get_game_profile(id: String) -> Result<Option<profile::GameProfile>, String> {
-    profile::get(&id).map_err(|e| e.to_string())
-}
-
 /// 创建游戏档案（目前仅实现离线登录，其它登录方式留入口）
 #[tauri::command]
 async fn create_game_profile(
@@ -431,22 +455,6 @@ async fn get_last_launched_instance() -> Result<Option<runtime::LastLaunchedInst
     runtime::get_last_launched()
         .await
         .map_err(|e| e.to_string())
-}
-
-/// 记录最后一次启动的实例（供未来启动模块调用）
-#[tauri::command]
-async fn record_last_launched_instance(
-    version_id: String,
-    name: String,
-    dir: String,
-) -> Result<(), String> {
-    runtime::record_last_launched(runtime::LastLaunchedInstance {
-        version_id,
-        name,
-        dir,
-    })
-    .await
-    .map_err(|e| e.to_string())
 }
 
 /// 获取实例目录下的自定义图标（data URL），不存在返回 null
@@ -565,14 +573,12 @@ pub fn run() {
             get_instance,
             update_instance,
             list_game_profiles,
-            get_game_profile,
             create_game_profile,
             delete_game_profile,
             get_current_profile,
             set_default_profile,
             get_profile_avatar,
             get_last_launched_instance,
-            record_last_launched_instance,
             get_instance_icon,
             launcher::launch_minecraft,
             launcher::stop_minecraft_session,

@@ -92,8 +92,7 @@ pub async fn install_loader(
     let (_, _) = patch::persist(&ctx.game_dir, &ctx.base.id, &ctx.base, &merged)?;
 
     if with_fabric_api && kind == LoaderKind::Fabric {
-        let mods_dir = ctx.game_dir.join("mods");
-        fabric::api::install_fabric_api(minecraft_version, &mods_dir).await?;
+        fabric::api::install_fabric_api(minecraft_version, ctx).await?;
     }
 
     tracing::info!(

@@ -13,10 +13,7 @@ import {
   type LoaderMeta,
   type LoaderVersion,
 } from "../../libs/loader";
-import {
-  get_loader_choice,
-  set_loader_choice,
-} from "../../libs/loader_choice";
+import { get_loader_choice, set_loader_choice } from "../../libs/loader_choice";
 import { neo_forge_supported } from "../../libs/mc_version";
 import { useToastStore } from "../../libs/toast";
 
@@ -114,12 +111,15 @@ async function loadLoaderVersions(): Promise<void> {
       // 优先沿用之前选过且仍存在的版本；否则取最新 stable
       const cached = get_loader_choice(mc);
       const previous =
-        cached && cached.kind === kind && list.some((v) => v.version === cached.version)
+        cached &&
+        cached.kind === kind &&
+        list.some((v) => v.version === cached.version)
           ? cached.version
           : "";
       pickVersion.value =
         previous || (list.find((v) => v.stable) ?? list[0]).version;
-      withFabricApi.value = cached?.kind === kind ? cached.withFabricApi : false;
+      withFabricApi.value =
+        cached?.kind === kind ? cached.withFabricApi : false;
     }
     commitChoice();
   } catch (e) {
@@ -149,7 +149,8 @@ onMounted(() => {
 function toggleLoader(id: LoaderId): void {
   const disabled = is_loader_disabled(id);
   // 当前版本不支持时仍允许「取消」掉之前残留的选择
-  const staleSelected = selectedKind.value === id && loader.value === null && disabled;
+  const staleSelected =
+    selectedKind.value === id && loader.value === null && disabled;
   if (disabled && !staleSelected) {
     pushToast({
       level: "warning",
@@ -291,11 +292,9 @@ const selectedVersionMeta = computed(() =>
               @click="onPickVersion(v.version)"
             >
               <span class="version-id">{{ v.version }}</span>
-              <span
-                class="version-tag"
-                :class="v.stable ? 'stable' : 'beta'"
-                >{{ v.stable ? "稳定" : "预览" }}</span
-              >
+              <span class="version-tag" :class="v.stable ? 'stable' : 'beta'">{{
+                v.stable ? "稳定" : "预览"
+              }}</span>
               <mdui-icon-check
                 v-if="v.version === pickVersion"
                 class="mark"
@@ -433,7 +432,7 @@ const selectedVersionMeta = computed(() =>
   overflow-y: auto;
   border: 1px solid rgb(var(--mdui-color-outline-variant));
   border-radius: var(--mdui-shape-corner-extra-large);
-  padding: 4px;
+  padding: 1rem;
 }
 
 .version-item {

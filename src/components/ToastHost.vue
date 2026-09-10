@@ -8,7 +8,7 @@ import { listen } from '@tauri-apps/api/event';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRunningStore } from '../libs/running';
 import {
-    DownloadProgressPayload, ToastItem, ToastLevel, ToastPayload, useToastStore,
+    DownloadProgressPayload, PHASE_LABELS, ToastItem, ToastLevel, ToastPayload, useToastStore,
 } from '../libs/toast';
 
 const { toasts, pushToast, dismissToast, handleDownloadProgress } = useToastStore();
@@ -80,7 +80,7 @@ function toast_body(t: ToastItem): string {
     if (!t.download) return t.message ?? '';
     if (t.download.finished) return t.download.message ?? '';
     const d = t.download;
-    let s = `阶段 ${d.phase} | 文件 ${d.index}/${d.count}`;
+    let s = `${PHASE_LABELS[d.phase]} | 文件 ${d.index}/${d.count}`;
     s += ` | ${fmt_bytes(d.bytesDone)}/${fmt_bytes(d.bytesTotal)}`;
     if (d.speed > 0) s += ` | ${fmt_bytes(d.speed)}/s`;
     return s;

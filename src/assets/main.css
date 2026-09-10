@@ -8,3 +8,40 @@
     border-color: rgb(var(--mdui-color-primary));
     box-shadow: var(--mdui-elevation-level5);
 }
+
+/* ===== 全局滚动条 ===== */
+/* Chrome / Edge / Safari */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgb(var(--mdui-color-on-secondary));
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--mdui-color-secondary));
+}
+
+::-webkit-scrollbar-button {
+    display: none !important;
+    background: transparent;
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--mdui-color-on-secondary)) transparent;
+    /* thumb track */
+}
+

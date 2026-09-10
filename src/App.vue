@@ -10,7 +10,10 @@ import {
   useProfileStore,
 } from "./libs/profile";
 import { launch_backend } from "./libs/running";
-import { trackRouteTransition, useRouteTransitionName } from "./libs/route_transition";
+import {
+  trackRouteTransition,
+  useRouteTransitionName,
+} from "./libs/route_transition";
 import MCIcon from "./assets/mc_icon.png";
 import SteveIcon from "./assets/steve.png";
 import "@mdui/icons/notifications";

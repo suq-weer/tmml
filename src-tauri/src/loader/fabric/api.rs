@@ -7,7 +7,9 @@ use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use std::collections::HashMap;
 
+use crate::downloader::minecraft::DownloadPhase;
 use crate::loader::download::{download_file, sha1_hex_file};
+use crate::loader::InstallContext;
 
 /// Modrinth 单条版本记录（仅取用所需字段）
 #[derive(Deserialize, Debug, Clone)]
@@ -70,10 +72,7 @@ fn pick_version(versions: &[ModrinthVersion]) -> Option<&ModrinthVersion> {
 }
 
 /// 下载适配指定 MC 版本的 Fabric API，落盘到 mods_dir；返回文件名
-pub async fn install_fabric_api(
-    minecraft_version: &str,
-    mods_dir: &std::path::Path,
-) -> Result<String> {
+pub async fn install_fabric_api(minecraft_version: &str, ctx: &InstallContext) -> Result<String> {
     let versions = query_versions(minecraft_version).await?;
     let chosen = pick_version(&versions).ok_or_else(|| {
         anyhow::anyhow!(
@@ -88,10 +87,14 @@ pub async fn install_fabric_api(
         .or_else(|| chosen.files.first())
         .ok_or_else(|| anyhow::anyhow!("Fabric API 版本缺少可下载文件"))?;
 
-    std::fs::create_dir_all(mods_dir).context("创建 mods 目录失败")?;
+    let mods_dir = ctx.game_dir.join("mods");
+    std::fs::create_dir_all(&mods_dir).context("创建 mods 目录失败")?;
     let dest = mods_dir.join(&file.filename);
     let sha1 = file.hashes.get("sha1").map(String::as_str);
-    download_file(&file.url, &dest, sha1).await?;
+
+    let progress = ctx.progress(DownloadPhase::LoaderFabricApi, 1, file.size);
+    download_file(&file.url, &dest, sha1, Some(&progress)).await?;
+    progress.emit(String::new(), 0, 0, 0, true, false);
 
     let computed = sha1_hex_file(&dest)?;
     if let Some(expected) = sha1 {

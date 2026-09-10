@@ -44,6 +44,14 @@ pub enum DownloadPhase {
     AssetsIndex,
     Logging,
     Assets,
+    /// 下载加载器安装器 / 拉取加载器元数据
+    LoaderInstaller,
+    /// 下载加载器所需库文件
+    LoaderLibraries,
+    /// 执行加载器安装处理器（NeoForge）
+    LoaderProcessors,
+    /// 安装 Fabric API 模组
+    LoaderFabricApi,
 }
 
 #[derive(serde::Serialize, Clone, Debug)]
@@ -126,7 +134,7 @@ fn resolve_url(mirror: Option<&str>, kind: TaskKind, official: &str, version_id:
 // | 进度上报 |
 
 #[derive(Clone)]
-struct PhaseProgress {
+pub(crate) struct PhaseProgress {
     app: AppHandle,
     version_id: String,
     phase: DownloadPhase,
@@ -146,7 +154,46 @@ fn now_ms() -> u64 {
 }
 
 impl PhaseProgress {
-    fn emit(
+    /// 构造一个阶段进度上报器，供原版下载与加载器安装共用
+    pub(crate) fn new(
+        app: AppHandle,
+        version_id: String,
+        phase: DownloadPhase,
+        count: u64,
+        bytes_total: u64,
+    ) -> Self {
+        Self {
+            app,
+            version_id,
+            phase,
+            count,
+            files_done: Arc::new(AtomicUsize::new(0)),
+            bytes_done: Arc::new(AtomicU64::new(0)),
+            bytes_total,
+            reused: Arc::new(AtomicUsize::new(0)),
+            last_emit: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    /// 记录一个已下载完成（或复用）的文件，累加字节与计数
+    pub(crate) fn add_done(&self, size: u64) {
+        self.bytes_done.fetch_add(size, Ordering::Relaxed);
+        self.files_done.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// 记录一个被复用的文件（已存在无需下载）
+    pub(crate) fn add_reused(&self, size: u64) {
+        self.bytes_done.fetch_add(size, Ordering::Relaxed);
+        self.files_done.fetch_add(1, Ordering::Relaxed);
+        self.reused.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// 只累加文件计数（用于无字节量的步骤，如处理器）
+    pub(crate) fn add_file(&self) {
+        self.files_done.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn emit(
         &self,
         name: String,
         file_bytes_done: u64,
@@ -178,7 +225,7 @@ impl PhaseProgress {
     }
 
     /// 节流 emit：同一阶段 150ms 内最多 emit 一次，避免复用/完成大量文件时的事件洪泛
-    fn emit_throttled(
+    pub(crate) fn emit_throttled(
         &self,
         name: String,
         file_bytes_done: u64,
@@ -451,17 +498,13 @@ impl MinecraftDownloader {
             return Ok(());
         }
         let bytes_total: u64 = tasks.iter().map(|t| t.size).sum();
-        let progress = PhaseProgress {
-            app: self.app.clone(),
-            version_id: version_id.to_string(),
+        let progress = PhaseProgress::new(
+            self.app.clone(),
+            version_id.to_string(),
             phase,
-            count: tasks.len() as u64,
-            files_done: Arc::new(AtomicUsize::new(0)),
-            bytes_done: Arc::new(AtomicU64::new(0)),
+            tasks.len() as u64,
             bytes_total,
-            reused: Arc::new(AtomicUsize::new(0)),
-            last_emit: Arc::new(AtomicU64::new(0)),
-        };
+        );
         let results: Vec<Result<()>> = stream::iter(tasks)
             .map(|task| {
                 let progress = progress.clone();

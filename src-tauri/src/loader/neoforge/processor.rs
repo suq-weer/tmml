@@ -17,6 +17,7 @@ use tokio::process::Command;
 use zip::ZipArchive;
 
 use crate::{
+    downloader::minecraft::DownloadPhase,
     loader::{
         install_ctx::InstallContext,
         maven::relative_path_of,
@@ -364,6 +365,9 @@ impl<'a> ProcessorRunner<'a> {
             .filter(|p| p.for_client())
             .cloned()
             .collect();
+        let progress =
+            self.ctx
+                .progress(DownloadPhase::LoaderProcessors, processors.len() as u64, 0);
         for (index, proc) in processors.iter().enumerate() {
             tracing::info!(
                 "执行 processor {}/{}: {}",
@@ -372,7 +376,11 @@ impl<'a> ProcessorRunner<'a> {
                 proc.jar
             );
             self.run_one(proc).await?;
+            progress.add_file();
+            // 处理器无字节量，仅推进计数，不展示具体文件行
+            progress.emit(String::new(), 0, 0, 0, false, false);
         }
+        progress.emit(String::new(), 0, 0, 0, true, false);
         Ok(())
     }
 

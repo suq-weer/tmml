@@ -1,8 +1,31 @@
 <script lang="ts" setup>
 import '@mdui/icons/arrow-forward.js';
-import { ALL_PHASES, DownloadPhaseState, DownloadToastState } from '../libs/toast';
+import { computed } from 'vue';
+import {
+    ALL_PHASES, DownloadPhase, DownloadPhaseState, DownloadToastState, PHASE_LABELS,
+} from '../libs/toast';
 
-defineProps<{ state: DownloadToastState }>();
+const props = defineProps<{ state: DownloadToastState }>();
+
+const LOADER_PHASES = new Set<DownloadPhase>([
+    'loaderInstaller',
+    'loaderLibraries',
+    'loaderProcessors',
+    'loaderFabricApi',
+]);
+
+/** 加载器阶段仅在开始安装加载器后才展示，避免纯净版下载时出现永远转圈的行 */
+const loader_started = computed(() =>
+    ALL_PHASES.some((p) => {
+        if (!LOADER_PHASES.has(p)) return false;
+        const ps = props.state.phases[p];
+        return ps.totalFiles > 0 || ps.finished;
+    }),
+);
+
+const visible_phases = computed(() =>
+    ALL_PHASES.filter((p) => !LOADER_PHASES.has(p) || loader_started.value),
+);
 
 function phase_percent(ps: DownloadPhaseState): number {
     if (ps.totalFiles === 0) return 0;
@@ -17,14 +40,14 @@ function basename(path: string): string {
 
 <template>
     <div class="detail">
-        <div v-for="p in ALL_PHASES" :key="p" class="phase-row">
+        <div v-for="p in visible_phases" :key="p" class="phase-row">
             <mdui-circular-progress
                 v-if="state.phases[p].totalFiles > 0"
                 class="phase-spinner"
                 :value="phase_percent(state.phases[p])"
             ></mdui-circular-progress>
             <mdui-circular-progress v-else class="phase-spinner"></mdui-circular-progress>
-            <span class="phase-label">下载 {{ p }} 阶段</span>
+            <span class="phase-label">{{ PHASE_LABELS[p] }}</span>
             <span v-if="state.phases[p].totalFiles > 0" class="phase-pct">
                 {{ Math.round(phase_percent(state.phases[p]) * 100) }}%
             </span>
